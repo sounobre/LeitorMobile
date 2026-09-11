@@ -1005,7 +1005,7 @@ Evidências:
 Unknowns:
 
 - `[ASK USER]` O escopo parcial observado é a sincronização correta do produto ou faltam annotations, bookmarks, preferências, downloads remotos e exclusões?
-- `[ASK USER]` O mobile local-first é a superfície principal ou o backend/web devem ser considerados fonte autoritativa?
+- `[ASK USER]` Qual é a fonte autoritativa de dados durante conflitos entre backend e armazenamento local?
 
 ## CAP-023 — Criar e restaurar backup completo mobile
 
@@ -1197,11 +1197,14 @@ Esta seção evita transformar endpoints em capabilities adicionais. Os paths ab
 - `VERIFIED`: **22**.
 - `PARTIALLY_VERIFIED`: **2** — CAP-005, CAP-016.
 - `UNKNOWN_INTENT`: **1** — CAP-022.
-- Apenas web (com backend): **CAP-005, CAP-008**.
-- Apenas mobile: **CAP-004, CAP-006, CAP-009, CAP-011, CAP-012, CAP-013, CAP-015, CAP-023, CAP-024**.
-- Apenas backend: **CAP-002, CAP-020, CAP-021, CAP-025**.
-- Compartilhadas entre web/mobile/backend em algum grau: **CAP-001, CAP-003, CAP-007, CAP-010, CAP-014, CAP-016, CAP-017, CAP-018, CAP-019**.
-- Mobile + backend, sem consumidor web equivalente: **CAP-022**.
+
+| Superfície | Capabilities |
+|---|---|
+| `BACKEND` | CAP-002, CAP-020, CAP-021, CAP-025 |
+| `WEB + BACKEND` | CAP-003, CAP-005, CAP-008 |
+| `MOBILE` | CAP-004, CAP-006, CAP-009, CAP-011, CAP-012, CAP-013, CAP-015, CAP-023, CAP-024 |
+| `MOBILE + BACKEND` | CAP-022 |
+| `WEB + MOBILE + BACKEND` | CAP-001, CAP-007, CAP-010, CAP-014, CAP-016, CAP-017, CAP-018, CAP-019 |
 
 ### Diferenças funcionais relevantes web/mobile
 
@@ -1219,7 +1222,7 @@ Esta seção evita transformar endpoints em capabilities adicionais. Os paths ab
 
 ### Perguntas `[ASK USER]`
 
-1. `[ASK USER]` Qual superfície é autoritativa: web + backend + mobile sincronizado ou mobile local-first?
+1. `[ASK USER]` Qual é a fonte autoritativa de dados durante conflitos entre backend e armazenamento local?
 2. `[ASK USER]` O escopo atual de sync é deliberadamente books/progresso/conteúdo/léxico/cards, ou faltam annotations, bookmarks, preferências, downloads remotos e exclusões?
 3. `[ASK USER]` O profile Ollama deve permanecer ativo por padrão ou ser explicitamente opt-in?
 4. `[ASK USER]` A validação EPUB forte do mobile também é requisito do upload web/backend?

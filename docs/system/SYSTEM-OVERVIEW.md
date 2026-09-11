@@ -134,7 +134,7 @@ O fluxo encontrado não baixa um livro remoto que não exista localmente, nem en
 
 ## Unknowns dependentes de intenção humana
 
-1. `[ASK USER]` A superfície autoritativa é o conjunto web + backend + mobile sincronizado, ou o produto deve ser considerado mobile local-first?
+1. `[ASK USER]` Qual é a fonte autoritativa de dados durante conflitos entre backend e armazenamento local?
 2. `[ASK USER]` O escopo pretendido de sincronização inclui annotations, bookmarks e preferências?
 3. `[ASK USER]` O profile Ollama deve ser ativo por padrão ou explicitamente opt-in?
 4. `[ASK USER]` A validação EPUB aplicada no mobile é requisito funcional obrigatório para o upload web/backend?
