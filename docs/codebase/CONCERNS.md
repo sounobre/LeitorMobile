@@ -95,3 +95,8 @@ Esta lista não corrige problemas. Ela registra divergências, riscos técnicos 
 - `docs/leitor-inteligente-copyright-aware-ai.md`
 - `leitor-epub/docs/QA-ANDROID.md`
 
+## 9) BUG_CANDIDATE
+
+| Classificação | Concern | Relação | Evidência | Comportamento observado | Estado |
+|---|---|---|---|---|---|
+| BUG_CANDIDATE | Cálculo de `queueOrder` usa diretamente o maior valor existente | CAP-017, CAP-018, API-011, API-015 | `backend/src/main/java/br/com/leitormobile/card/CardRepository.java`; `backend/src/main/java/br/com/leitormobile/card/CardService.java` | `findNextQueueOrder(ownerId)` executa `coalesce(max(c.queueOrder), -1)`. `CardService.create()` usa diretamente o valor ao criar o card e `CardService.moveToEnd()` usa diretamente o mesmo cálculo ao mover. Quando já existe um maior valor, o novo/movido card pode receber o mesmo `queueOrder`, produzindo duplicidade e podendo impedir que “move to end” o coloque estritamente após os demais. | Candidato verificável somente no código; requer execução/teste para confirmar o comportamento runtime. Nenhuma correção foi aplicada. |

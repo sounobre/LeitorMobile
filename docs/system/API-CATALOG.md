@@ -2080,9 +2080,13 @@ Consumer:
 
 - MOBILE — `leitor-epub/src/services/lookup.ts::lookupDictionary`.
 
+Capability principal:
+
+- CAP-016 — Consultar léxico e definições.
+
 Capability relacionada:
 
-- CAP-013.
+- CAP-014 — Executar ações sobre texto selecionado; no mobile, o lookup parte da seleção no reader.
 
 Request:
 
@@ -2112,6 +2116,7 @@ Integrações/effects:
 Evidence:
 
 - `leitor-epub/src/services/lookup.ts`
+- `leitor-epub/app/reader/[id].tsx`
 - `leitor-epub/src/db/repository.ts`
 - `leitor-epub/src/services/lexicon.ts`
 
