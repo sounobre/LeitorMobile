@@ -1,0 +1,10 @@
+app:
+  ai:
+    enabled: true
+    provider: ollama
+    local-only: true
+    ollama:
+      base-url: http://127.0.0.1:11434
+      model: ${OLLAMA_MODEL:qwen3.5:9b}
+      max-candidates: ${OLLAMA_MAX_CANDIDATES:500}
+
