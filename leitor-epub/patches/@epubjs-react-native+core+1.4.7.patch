@@ -1,0 +1,272 @@
+diff --git a/node_modules/@epubjs-react-native/core/lib/commonjs/Reader.js b/node_modules/@epubjs-react-native/core/lib/commonjs/Reader.js
+index f65d1fe..e8e43c9 100644
+--- a/node_modules/@epubjs-react-native/core/lib/commonjs/Reader.js
++++ b/node_modules/@epubjs-react-native/core/lib/commonjs/Reader.js
+@@ -53,7 +53,7 @@ function Reader({
+     writeAsStringAsync
+   } = useFileSystem();
+   const enableSelection = menuItems ? true : rest.enableSelection || false;
+-  const allowPopups = onPressExternalLink ? true : rest.allowPopups || false;
++  const allowPopups = rest.allowPopups || false;
+   const {
+     setIsLoading,
+     isLoading
+diff --git a/node_modules/@epubjs-react-native/core/lib/commonjs/View.js b/node_modules/@epubjs-react-native/core/lib/commonjs/View.js
+index 0de0fef..cf55638 100644
+--- a/node_modules/@epubjs-react-native/core/lib/commonjs/View.js
++++ b/node_modules/@epubjs-react-native/core/lib/commonjs/View.js
+@@ -35,3 +35,4 @@ function View({
+   onPress = () => {},
+   onSingleTap = () => {},
++  onTouchStart = () => {},
+   onDoublePress = () => {},
+@@ -351,11 +351,21 @@ function View({
+     });
+   };
+   const handleOnShouldStartLoadWithRequest = request => {
+-    if (!isRendering && request.mainDocumentURL && request.url !== request.mainDocumentURL) {
+-      goToLocation(request.url.replace(request.mainDocumentURL, ''));
++    const url = request.url || '';
++    if (/^(https?:|mailto:|tel:)/i.test(url)) {
++      if (onPressExternalLink) onPressExternalLink(url);
++      return false;
+     }
+-    if ((request.url.includes('mailto:') || request.url.includes('tel:')) && onPressExternalLink) {
+-      onPressExternalLink(request.url);
++    if (!/^(file:|about:blank|data:|blob:)/i.test(url)) return false;
++
++    if (!isRendering && request.mainDocumentURL && url !== request.mainDocumentURL) {
++      const documentUrl = request.mainDocumentURL.split('#')[0];
++      const fragmentIndex = url.indexOf('#');
++      if (fragmentIndex >= 0 && url.slice(0, fragmentIndex) === documentUrl) {
++        goToLocation(url.slice(fragmentIndex));
++        return false;
++      }
++      if (/^file:/i.test(url) && url.split('#')[0] !== documentUrl) return false;
+     }
+     return true;
+   };
+@@ -373,5 +384,6 @@
+     onSingleTap: () => {
+       onPress();
+       onSingleTap();
+     },
++    onTouchStart: onTouchStart,
+     onDoubleTap: () => {
+@@ -418,9 +428,9 @@ function View({
+     },
+     showsVerticalScrollIndicator: false,
+     javaScriptEnabled: true,
+-    originWhitelist: ['*'],
++    originWhitelist: ['file://*', 'about:blank', 'data:*', 'blob:*'],
+     scrollEnabled: false,
+-    mixedContentMode: "compatibility",
++    mixedContentMode: "never",
+     onMessage: onMessage,
+     menuItems: menuItems?.map((item, key) => ({
+       label: item.label,
+@@ -428,10 +438,11 @@ function View({
+     })),
+     onCustomMenuSelection: handleOnCustomMenuSelection,
+     allowingReadAccessToURL: allowedUris,
+-    allowUniversalAccessFromFileURLs: true,
++    allowUniversalAccessFromFileURLs: false,
+     allowFileAccessFromFileURLs: true,
+     allowFileAccess: true,
+-    javaScriptCanOpenWindowsAutomatically: true,
++    javaScriptCanOpenWindowsAutomatically: false,
++    setSupportMultipleWindows: false,
+     onOpenWindow: event => {
+       event.preventDefault();
+       if (onPressExternalLink) {
+diff --git a/node_modules/@epubjs-react-native/core/lib/commonjs/context.js b/node_modules/@epubjs-react-native/core/lib/commonjs/context.js
+index 7128386..b67836a 100644
+--- a/node_modules/@epubjs-react-native/core/lib/commonjs/context.js
++++ b/node_modules/@epubjs-react-native/core/lib/commonjs/context.js
+@@ -393,7 +393,7 @@ function ReaderProvider({
+     });
+   }, []);
+   const goToLocation = (0, _react.useCallback)(targetCfi => {
+-    book.current?.injectJavaScript(`rendition.display('${targetCfi}'); true`);
++    book.current?.injectJavaScript(`rendition.display(${JSON.stringify(targetCfi)}); true`);
+   }, []);
+   const goPrevious = (0, _react.useCallback)(options => {
+     webViewInjectFunctions.injectJavaScript(book, `
+@@ -528,7 +528,7 @@ function ReaderProvider({
+   const removeAnnotationByCfi = (0, _react.useCallback)(cfiRange => {
+     webViewInjectFunctions.injectJavaScript(book, `
+         ['highlight', 'underline', 'mark'].forEach(type => {
+-          rendition.annotations.remove('${cfiRange}', type);
++          rendition.annotations.remove(${JSON.stringify(cfiRange)}, type);
+         });
+ 
+         ${webViewInjectFunctions.onChangeAnnotations()}
+diff --git a/node_modules/@epubjs-react-native/core/lib/commonjs/utils/GestureHandler.js b/node_modules/@epubjs-react-native/core/lib/commonjs/utils/GestureHandler.js
+--- a/node_modules/@epubjs-react-native/core/lib/commonjs/utils/GestureHandler.js
++++ b/node_modules/@epubjs-react-native/core/lib/commonjs/utils/GestureHandler.js
+@@ -11,6 +11,7 @@ function GestureHandler({
+   width = '100%',
+   height = '100%',
+   onSingleTap,
++  onTouchStart = () => {},
+   onDoubleTap,
+   onSwipeLeft,
+   onSwipeRight,
+@@ -23,1 +24,1 @@
+-  const singleTap = _reactNativeGestureHandler.Gesture.Tap().runOnJS(true).maxDuration(250).onStart(onSingleTap);
++  const singleTap = _reactNativeGestureHandler.Gesture.Tap().runOnJS(true).onTouchesDown(() => onTouchStart()).maxDuration(250).maxDistance(8).onStart(onSingleTap);
+@@ -66,3 +66,3 @@
+   }, /*#__PURE__*/_react.default.createElement(_reactNativeGestureHandler.GestureDetector, {
+-    gesture: _reactNativeGestureHandler.Gesture.Exclusive(swipeLeft, swipeRight)
++    gesture: _reactNativeGestureHandler.Gesture.Exclusive(swipeLeft, swipeRight, singleTap)
+   }, /*#__PURE__*/_react.default.createElement(_reactNative.View, {
+diff --git a/node_modules/@epubjs-react-native/core/lib/module/utils/GestureHandler.js b/node_modules/@epubjs-react-native/core/lib/module/utils/GestureHandler.js
+--- a/node_modules/@epubjs-react-native/core/lib/module/utils/GestureHandler.js
++++ b/node_modules/@epubjs-react-native/core/lib/module/utils/GestureHandler.js
+@@ -4,6 +4,7 @@ export function GestureHandler({
+   width = '100%',
+   height = '100%',
+   onSingleTap,
++  onTouchStart = () => {},
+   onDoubleTap,
+   onSwipeLeft,
+   onSwipeRight,
+@@ -16,1 +17,1 @@
+-  const singleTap = Gesture.Tap().runOnJS(true).maxDuration(250).onStart(onSingleTap);
++  const singleTap = Gesture.Tap().runOnJS(true).onTouchesDown(() => onTouchStart()).maxDuration(250).maxDistance(8).onStart(onSingleTap);
+@@ -59,3 +59,3 @@
+   }, /*#__PURE__*/React.createElement(GestureDetector, {
+-    gesture: Gesture.Exclusive(swipeLeft, swipeRight)
++    gesture: Gesture.Exclusive(swipeLeft, swipeRight, singleTap)
+   }, /*#__PURE__*/React.createElement(View, {
+diff --git a/node_modules/@epubjs-react-native/core/lib/commonjs/template.js b/node_modules/@epubjs-react-native/core/lib/commonjs/template.js
+--- a/node_modules/@epubjs-react-native/core/lib/commonjs/template.js
++++ b/node_modules/@epubjs-react-native/core/lib/commonjs/template.js
+@@ -258,6 +258,5 @@
+       rendition.on("relocated", function (location) {
+-        var percent = book.locations.percentageFromCfi(location.start.cfi);
+-        var percentage = Math.floor(percent * 100);
++        var progress = book.locations.percentageFromCfi(location.start.cfi);
+         var chapter = getChapter(location);
+ 
+         reactNativeWebview.postMessage(JSON.stringify({
+@@ -266,1 +265,1 @@
+-          progress: percentage,
++          progress: progress,
+diff --git a/node_modules/@epubjs-react-native/core/lib/module/template.js b/node_modules/@epubjs-react-native/core/lib/module/template.js
+--- a/node_modules/@epubjs-react-native/core/lib/module/template.js
++++ b/node_modules/@epubjs-react-native/core/lib/module/template.js
+@@ -250,6 +250,5 @@
+       rendition.on("relocated", function (location) {
+-        var percent = book.locations.percentageFromCfi(location.start.cfi);
+-        var percentage = Math.floor(percent * 100);
++        var progress = book.locations.percentageFromCfi(location.start.cfi);
+         var chapter = getChapter(location);
+ 
+         reactNativeWebview.postMessage(JSON.stringify({
+@@ -258,1 +257,1 @@
+-          progress: percentage,
++          progress: progress,
+diff --git a/node_modules/@epubjs-react-native/core/lib/module/Reader.js b/node_modules/@epubjs-react-native/core/lib/module/Reader.js
+index 2350836..9af4046 100644
+--- a/node_modules/@epubjs-react-native/core/lib/module/Reader.js
++++ b/node_modules/@epubjs-react-native/core/lib/module/Reader.js
+@@ -44,7 +44,7 @@ export function Reader({
+     writeAsStringAsync
+   } = useFileSystem();
+   const enableSelection = menuItems ? true : rest.enableSelection || false;
+-  const allowPopups = onPressExternalLink ? true : rest.allowPopups || false;
++  const allowPopups = rest.allowPopups || false;
+   const {
+     setIsLoading,
+     isLoading
+diff --git a/node_modules/@epubjs-react-native/core/lib/module/View.js b/node_modules/@epubjs-react-native/core/lib/module/View.js
+index 63f3c24..8786a9a 100644
+--- a/node_modules/@epubjs-react-native/core/lib/module/View.js
++++ b/node_modules/@epubjs-react-native/core/lib/module/View.js
+@@ -26,3 +26,4 @@ export function View({
+   onPress = () => {},
+   onSingleTap = () => {},
++  onTouchStart = () => {},
+   onDoublePress = () => {},
+@@ -342,11 +342,21 @@ export function View({
+     });
+   };
+   const handleOnShouldStartLoadWithRequest = request => {
+-    if (!isRendering && request.mainDocumentURL && request.url !== request.mainDocumentURL) {
+-      goToLocation(request.url.replace(request.mainDocumentURL, ''));
++    const url = request.url || '';
++    if (/^(https?:|mailto:|tel:)/i.test(url)) {
++      if (onPressExternalLink) onPressExternalLink(url);
++      return false;
+     }
+-    if ((request.url.includes('mailto:') || request.url.includes('tel:')) && onPressExternalLink) {
+-      onPressExternalLink(request.url);
++    if (!/^(file:|about:blank|data:|blob:)/i.test(url)) return false;
++
++    if (!isRendering && request.mainDocumentURL && url !== request.mainDocumentURL) {
++      const documentUrl = request.mainDocumentURL.split('#')[0];
++      const fragmentIndex = url.indexOf('#');
++      if (fragmentIndex >= 0 && url.slice(0, fragmentIndex) === documentUrl) {
++        goToLocation(url.slice(fragmentIndex));
++        return false;
++      }
++      if (/^file:/i.test(url) && url.split('#')[0] !== documentUrl) return false;
+     }
+     return true;
+   };
+@@ -364,5 +375,6 @@
+     onSingleTap: () => {
+       onPress();
+       onSingleTap();
+     },
++    onTouchStart: onTouchStart,
+     onDoubleTap: () => {
+@@ -409,9 +419,9 @@ export function View({
+     },
+     showsVerticalScrollIndicator: false,
+     javaScriptEnabled: true,
+-    originWhitelist: ['*'],
++    originWhitelist: ['file://*', 'about:blank', 'data:*', 'blob:*'],
+     scrollEnabled: false,
+-    mixedContentMode: "compatibility",
++    mixedContentMode: "never",
+     onMessage: onMessage,
+     menuItems: menuItems?.map((item, key) => ({
+       label: item.label,
+@@ -419,10 +429,11 @@ export function View({
+     })),
+     onCustomMenuSelection: handleOnCustomMenuSelection,
+     allowingReadAccessToURL: allowedUris,
+-    allowUniversalAccessFromFileURLs: true,
++    allowUniversalAccessFromFileURLs: false,
+     allowFileAccessFromFileURLs: true,
+     allowFileAccess: true,
+-    javaScriptCanOpenWindowsAutomatically: true,
++    javaScriptCanOpenWindowsAutomatically: false,
++    setSupportMultipleWindows: false,
+     onOpenWindow: event => {
+       event.preventDefault();
+       if (onPressExternalLink) {
+diff --git a/node_modules/@epubjs-react-native/core/lib/module/context.js b/node_modules/@epubjs-react-native/core/lib/module/context.js
+index cd82920..fda9672 100644
+--- a/node_modules/@epubjs-react-native/core/lib/module/context.js
++++ b/node_modules/@epubjs-react-native/core/lib/module/context.js
+@@ -383,7 +383,7 @@ function ReaderProvider({
+     });
+   }, []);
+   const goToLocation = useCallback(targetCfi => {
+-    book.current?.injectJavaScript(`rendition.display('${targetCfi}'); true`);
++    book.current?.injectJavaScript(`rendition.display(${JSON.stringify(targetCfi)}); true`);
+   }, []);
+   const goPrevious = useCallback(options => {
+     webViewInjectFunctions.injectJavaScript(book, `
+@@ -518,7 +518,7 @@ function ReaderProvider({
+   const removeAnnotationByCfi = useCallback(cfiRange => {
+     webViewInjectFunctions.injectJavaScript(book, `
+         ['highlight', 'underline', 'mark'].forEach(type => {
+-          rendition.annotations.remove('${cfiRange}', type);
++          rendition.annotations.remove(${JSON.stringify(cfiRange)}, type);
+         });
+ 
+         ${webViewInjectFunctions.onChangeAnnotations()}

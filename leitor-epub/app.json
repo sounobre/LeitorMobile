@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "Leitor EPUB",
+    "slug": "leitor-epub",
+    "scheme": "leitorepub",
+    "version": "0.1.0",
+    "icon": "./assets/icon.png",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 29,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
+          }
+        }
+      ],
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true
+        }
+      ],
+      "expo-sharing",
+      "expo-web-browser",
+      "expo-font"
+    ],
+    "android": {
+      "package": "com.example.leitorepub",
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "allowBackup": false,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0B4A37"
+      },
+      "predictiveBackGestureEnabled": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.example.leitorepub",
+      "supportsTablet": true
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "productName": "Leitor EPUB",
+      "supportEmail": "suporte@example.com",
+      "router": {},
+      "eas": {
+        "projectId": "2f659307-0a2d-4d8f-bd00-cd1eef9dd022"
+      }
+    }
+  }
+}
