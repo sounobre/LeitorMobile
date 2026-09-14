@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/leitor_test
+    username: leitor_test_user
+    password: ${TEST_DATABASE_PASSWORD}
+  flyway:
+    enabled: true
+
+app:
+  storage-directory: ${java.io.tmpdir}/LeitorMobileTests/backend-storage

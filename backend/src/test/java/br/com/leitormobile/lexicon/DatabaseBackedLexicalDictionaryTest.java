@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import br.com.leitormobile.support.PostgresIntegrationTestSupport;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(DatabaseBackedLexicalDictionary.class)
 @Transactional
-class DatabaseBackedLexicalDictionaryTest {
+class DatabaseBackedLexicalDictionaryTest extends PostgresIntegrationTestSupport {
     @Autowired
     private JdbcTemplate jdbc;
 

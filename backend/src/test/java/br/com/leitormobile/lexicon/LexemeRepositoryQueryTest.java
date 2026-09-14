@@ -3,6 +3,7 @@ package br.com.leitormobile.lexicon;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import br.com.leitormobile.support.PostgresIntegrationTestSupport;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional
-class LexemeRepositoryQueryTest {
+class LexemeRepositoryQueryTest extends PostgresIntegrationTestSupport {
     @Autowired
     private LexemeRepository lexemes;
 

@@ -3,6 +3,7 @@ package br.com.leitormobile.lexicon;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
 
+import br.com.leitormobile.support.PostgresIntegrationTestSupport;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(DatabaseBackedLexicalDictionary.class)
 @Transactional
-class DatabaseBackedLexicalDictionaryBatchTest {
+class DatabaseBackedLexicalDictionaryBatchTest extends PostgresIntegrationTestSupport {
     @Autowired
     private JdbcTemplate jdbc;
 

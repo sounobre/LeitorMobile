@@ -2,6 +2,7 @@ package br.com.leitormobile.lexicon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import br.com.leitormobile.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -12,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @JdbcTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional
-class LexicalDictionaryIndexTest {
+class LexicalDictionaryIndexTest extends PostgresIntegrationTestSupport {
     @Autowired
     private JdbcTemplate jdbc;
 

@@ -174,3 +174,56 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Resultado: BLOCKED antes do Maven, por ausência das variáveis de ambiente exigidas. Total/pass/failures/errors/skipped, exit code e Surefire não se aplicam.
 - Classificação: ENVIRONMENT / TEST_INFRASTRUCTURE.
 - Nenhum banco, migration, produção, teste, configuração ou credencial foi alterado. Não houve execução de Playwright, E2E ou Wave 1.
+
+## Wave 0 — Backend isolation follow-up 3
+
+- Commit: c7a2b1de83e5820ae9ba5e3cbb29083719daee23.
+- Data/hora UTC: 2026-09-14T18:46:30Z.
+- DATABASE_URL: NOT_SET.
+- Database/schema/user: não confirmados; a consulta SELECT current_database(), current_schema(), current_user; não foi executada.
+- Prova database != leitor: não obtida, pois o preflight de variáveis falhou antes da conexão.
+- Storage: APP_STORAGE_DIRECTORY=NOT_SET; nenhum storage foi usado. backend/data/library não foi acessado ou alterado.
+- Comando previsto: cd backend; mvn -q test.
+- Resultado: BLOCKED antes do Maven. Total/pass/failures/errors/skipped e exit code não se aplicam; nenhum relatório Surefire novo foi gerado.
+- Classificação: ENVIRONMENT / TEST_INFRASTRUCTURE.
+- Nenhum código, teste, migration ou configuração foi alterado nesta tentativa. Nenhum TEST ID da Wave 1 foi promovido.
+
+#### Retomada adicional do follow-up 3
+
+- Commit: c7a2b1de83e5820ae9ba5e3cbb29083719daee23.
+- Data/hora UTC: 2026-09-14T22:26:38Z.
+- Preflight: DATABASE_URL=NOT_SET; DATABASE_USERNAME=NOT_SET; DATABASE_PASSWORD=NOT_SET; APP_STORAGE_DIRECTORY=NOT_SET.
+- Database/schema/user e prova database != leitor: não confirmados; a regra de parada impediu a consulta PostgreSQL.
+- Storage: nenhum usado; backend/data/library não foi tocado.
+- Comando mvn: não executado, pois o preflight falhou.
+- Total/pass/failures/errors/skipped, exit code e Surefire: não aplicáveis.
+- Classificação: ENVIRONMENT / TEST_INFRASTRUCTURE. Nenhum TEST ID da Wave 1 foi promovido.
+
+## Wave 0 — Permanent backend test profile
+
+- Commit/base: c7a2b1de83e5820ae9ba5e3cbb29083719daee23.
+- Data/hora UTC: 2026-09-14T22:36:26Z.
+- application-test.yml criado em backend/src/test/resources/application-test.yml, sem senha versionada. O datasource fixo é jdbc:postgresql://127.0.0.1:5432/leitor_test, usuário leitor_test_user, e a senha é resolvida somente por TEST_DATABASE_PASSWORD.
+- Mecanismo de ativação: PostgresIntegrationTestSupport usa @ActiveProfiles("test") e é a superclasse compartilhada dos cinco testes Spring/JPA/JDBC relevantes. Testes unitários puros não foram alterados.
+- Guard: a base consulta current_database(), current_schema() e current_user antes de cada teste Spring e recusa qualquer alvo diferente de leitor_test/public; o database leitor não é aceito.
+- Database/schema/usuário confirmados: não confirmados. TEST_DATABASE_PASSWORD estava NOT_SET, portanto a conexão não foi tentada.
+- Storage configurado: ${java.io.tmpdir}/LeitorMobileTests/backend-storage; storage real não foi usado.
+- Comando previsto: cd backend; mvn -q test.
+- Resultado: BLOCKED antes do Maven por ausência de TEST_DATABASE_PASSWORD. Total/pass/failures/errors/skipped, exit code e Surefire não se aplicam.
+- Classificação: ENVIRONMENT / TEST_INFRASTRUCTURE.
+- Nenhum TEST ID da Wave 1 foi promovido. Wave 1 não iniciada e lint mobile não alterado.
+
+### Execução verificada após provisionamento de TEST_DATABASE_PASSWORD
+
+- Commit/base: c7a2b1de83e5820ae9ba5e3cbb29083719daee23.
+- Data/hora UTC: 2026-09-14T22:46:13Z.
+- Profile: `test`, ativado por `@ActiveProfiles("test")` na base compartilhada dos cinco testes Spring/JPA/JDBC; `backend/src/test/resources/application-test.yml` contém somente o placeholder `${TEST_DATABASE_PASSWORD}` para a senha.
+- Datasource: `jdbc:postgresql://127.0.0.1:5432/leitor_test`.
+- Database/schema/usuário confirmados antes e depois da suíte: `leitor_test` / `public` / `leitor_test_user`; prova explícita: `current_database() != leitor`.
+- Flyway: habilitado no profile e validou 6 migrations no schema `public` de `leitor_test`; nenhuma migration foi alterada.
+- Storage configurado: `C:\Users\souno\AppData\Local\Temp\LeitorMobileTests\backend-storage`; fora de `backend/data/library` e dedicado à execução de testes.
+- Comando: `cd backend; mvn -q test`.
+- Resultado: PASS; total=20, pass=20, failures=0, errors=0, skipped=0, exit code=0.
+- Surefire: 15 relatórios em `backend/target/surefire-reports/`, agregação confirmada pelos XMLs.
+- Verificações: `BookServiceTest` permanece com `@TempDir`; não há referência hardcoded adicional a `data/library` nos testes; `backend/data/library` não foi usado nem alterado.
+- TEST IDs: nenhum promovido; TEST-001–TEST-060 permanecem `NOT_RUN`.
