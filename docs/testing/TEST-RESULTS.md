@@ -150,3 +150,16 @@ Executar como administrador da instância PostgreSQL, fora do repositório, subs
     CREATE DATABASE leitor_test OWNER <TEST_DB_USER>;
 
 Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.0.0.1:5432/leitor_test, usar o usuário dedicado, apontar o storage para um diretório temporário identificável e comprovar com SELECT current_database(), current_schema(); que o retorno não é leitor antes de iniciar qualquer teste. A forma final de executar a suíte ainda deve preservar o isolamento do caso de filesystem hardcoded em BookServiceTest.
+
+## Wave 0 — Backend isolation follow-up 2
+
+- Commit: 66b7165c86860ec1e0a9a4f9159b1dbc8a2ae778.
+- Data/hora UTC: 2026-09-14T18:26:48Z.
+- Working tree antes da tentativa: limpa (git status --short sem saída).
+- Validação de variáveis, sem expor segredo: DATABASE_URL=NOT_SET; DATABASE_USERNAME=NOT_SET; DATABASE_PASSWORD=NOT_SET; APP_STORAGE_DIRECTORY=NOT_SET.
+- Database/host/porta/schema/usuário: não confirmados nesta tentativa. A consulta SELECT current_database(), current_schema(); não foi executada porque não havia credenciais de ambiente para autenticação.
+- Storage: nenhum diretório foi selecionado ou usado; backend/data/library não foi alterado.
+- Comando de teste previsto: cd backend; mvn -q test.
+- Resultado: BLOCKED antes do Maven, por ausência das variáveis de ambiente exigidas. Total/pass/failures/errors/skipped, exit code e Surefire não se aplicam.
+- Classificação: ENVIRONMENT / TEST_INFRASTRUCTURE.
+- Nenhum banco, migration, produção, teste, configuração ou credencial foi alterado. Não houve execução de Playwright, E2E ou Wave 1.
