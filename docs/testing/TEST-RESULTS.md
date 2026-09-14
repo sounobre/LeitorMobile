@@ -126,6 +126,17 @@ Somente este arquivo de resultados foi criado intencionalmente. Nenhum código d
 
 git status --short ao final: ?? docs/testing/TEST-RESULTS.md. Comparado ao estado inicial limpo, esta é a única alteração intencional.
 
+## Wave 0 — Filesystem isolation fix
+
+- Data/hora UTC: 2026-09-14T18:34:34Z.
+- Arquivo alterado: backend/src/test/java/br/com/leitormobile/book/BookServiceTest.java.
+- Causa: deletingBookRemovesStoredEpubAndAllKnownCoverFiles resolvia Path.of("data", "library"), apontando para o storage de desenvolvimento quando executado a partir de backend/.
+- Estratégia: injeção de JUnit 5 @TempDir Path storageRoot, exclusivo e temporário por execução do teste. O teste continua instanciando BookContentService com o mesmo storage recebido e mantém as assertions de remoção do EPUB, cover principal e stale cover.
+- Comando: cd backend; mvn -q -Dtest=BookServiceTest test.
+- Resultado: PASS; exit code 0. Surefire: tests=2, failures=0, errors=0, skipped=0, time=1.342 s. Relatório: backend/target/surefire-reports/TEST-br.com.leitormobile.book.BookServiceTest.xml.
+- Storage real backend/data/library alterado: NO. Após a execução havia 3 arquivos preexistentes, com criação em 08/09/2026 e 10/09/2026, todos anteriores a esta execução; não foram criados, removidos ou modificados pelo teste. Nenhum arquivo novo foi observado.
+- TEST IDs alterados: nenhum.
+
 ## Wave 0 — Backend isolation follow-up
 
 - Commit/base do follow-up: 294c9e2469c96812bf878c6a7fa8cc9d1eade652.

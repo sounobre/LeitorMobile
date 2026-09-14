@@ -16,15 +16,15 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.web.server.ResponseStatusException;
 
 class BookServiceTest {
 
     @Test
-    void deletingBookRemovesStoredEpubAndAllKnownCoverFiles() throws IOException {
+    void deletingBookRemovesStoredEpubAndAllKnownCoverFiles(@TempDir Path storageRoot) throws IOException {
         UUID bookId = UUID.randomUUID();
         UUID ownerId = UUID.randomUUID();
-        Path storageRoot = Path.of("data", "library").toAbsolutePath().normalize();
         Path epub = storageRoot.resolve("books").resolve(bookId + ".epub");
         Path cover = storageRoot.resolve("covers").resolve(bookId + ".jpg");
         Path staleCover = storageRoot.resolve("covers").resolve(bookId + ".png");
