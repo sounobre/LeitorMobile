@@ -125,3 +125,28 @@ Status inicial da Wave 0: NOT_RUN para todos os TEST IDs, exceto os dois itens E
 Somente este arquivo de resultados foi criado intencionalmente. Nenhum código de produção, teste, migration, fixture, banco, configuração versionada ou issue Linear foi alterado. Playwright, E2E web, E2E mobile e device não foram executados. A Wave 1 não foi iniciada.
 
 git status --short ao final: ?? docs/testing/TEST-RESULTS.md. Comparado ao estado inicial limpo, esta é a única alteração intencional.
+
+## Wave 0 — Backend isolation follow-up
+
+- Commit/base do follow-up: 294c9e2469c96812bf878c6a7fa8cc9d1eade652.
+- Baseline histórica preservada: f7eb4fed6dfd3a813be2de225312cd7f78bd799b.
+- Working tree antes do follow-up: limpa (git status --short sem saída).
+- Estratégia prevista: database PostgreSQL dedicado leitor_test na instância local, separado do database de desenvolvimento leitor; nenhuma criação, reset ou alteração foi executada.
+- Database/schema: leitor_test não foi provisionado nem confirmado; schema atual não foi retornado.
+- Storage temporário: nenhum diretório temporário foi criado ou usado; backend/data/library não foi acessado, limpo ou alterado nesta tentativa.
+- Comando de conexão de preflight: psql -h 127.0.0.1 -p 5432 -U leitor -d postgres -w -Atc "SELECT current_database(), current_schema();"
+- Resultado do preflight: exit code 1; fe_sendauth: no password supplied.
+- Evidência adicional: não havia variáveis DATABASE_*, PG*, TEST_DATABASE_* ou SPRING_DATASOURCE_* no ambiente; não havia arquivo local de credenciais; o Docker daemon estava indisponível. A configuração atual mantém DATABASE_URL default em jdbc:postgresql://localhost:5432/leitor, tratado como banco de desenvolvimento e não utilizado.
+- Datasource atual: @JdbcTest e @DataJpaTest usam @AutoConfigureTestDatabase(replace = NONE) e obtêm o datasource principal; não existe application-test.yml, profile de teste ou override seguro. Flyway está habilitado na configuração principal e, se executado, apontaria para o alvo informado ao processo.
+- Filesystem atual: BookContentService resolve app.storage-directory com default ./data/library; BookServiceTest também contém um caso que escreve diretamente em Path.of("data", "library"). Portanto, somente fornecer uma URL de banco não provaria isolamento suficiente do filesystem para a suíte completa.
+- Resultado do gate: BLOCKED. cd backend; mvn -q test não foi executado; total/pass/failures/errors/skipped e Surefire não existem para este follow-up.
+- Classificação da investigação: ENVIRONMENT / TEST_INFRASTRUCTURE. Nenhuma correção de produção, teste, migration, credencial, banco, volume ou storage foi aplicada.
+
+### Pré-requisito manual mínimo para desbloqueio
+
+Executar como administrador da instância PostgreSQL, fora do repositório, substituindo os placeholders por valores reais e mantendo o segredo fora do Git:
+
+    CREATE ROLE <TEST_DB_USER> LOGIN PASSWORD '<TEST_DB_PASSWORD>';
+    CREATE DATABASE leitor_test OWNER <TEST_DB_USER>;
+
+Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.0.0.1:5432/leitor_test, usar o usuário dedicado, apontar o storage para um diretório temporário identificável e comprovar com SELECT current_database(), current_schema(); que o retorno não é leitor antes de iniciar qualquer teste. A forma final de executar a suíte ainda deve preservar o isolamento do caso de filesystem hardcoded em BookServiceTest.
