@@ -41,15 +41,21 @@ function AuthGate() {
   const db = useSQLiteContext();
   const router = useRouter();
   const segments = useSegments();
-  const [ready, setReady] = useState(false);
   const inLogin = segments[0] === 'login';
+  const [lastAuthCheck, setLastAuthCheck] = useState<{
+    db: unknown;
+    inLogin: boolean;
+    router: unknown;
+  } | null>(null);
+  const ready = lastAuthCheck?.db === db
+    && lastAuthCheck.inLogin === inLogin
+    && lastAuthCheck.router === router;
 
   useEffect(() => {
     let cancelled = false;
-    setReady(false);
     void getSession(db).then((session) => {
       if (cancelled) return;
-      setReady(true);
+      setLastAuthCheck({ db, inLogin, router });
       if (!session && !inLogin) router.replace('/login');
       if (session && inLogin) router.replace('/');
     });

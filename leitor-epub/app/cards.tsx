@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -9,6 +9,20 @@ import { archiveCard, listBooks, listCards, moveCardToEnd, updateCard } from '@/
 import type { Book, CardDraft, CardRecord } from '@/types/domain';
 
 const SWIPE_THRESHOLD = 0.25;
+
+function createActionLock() {
+  let active = false;
+  return {
+    acquire() {
+      if (active) return false;
+      active = true;
+      return true;
+    },
+    release() {
+      active = false;
+    },
+  };
+}
 
 export default function CardsScreen() {
   const db = useSQLiteContext();
@@ -21,8 +35,8 @@ export default function CardsScreen() {
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<CardRecord | null>(null);
   const [message, setMessage] = useState('');
-  const cardPosition = useRef(new Animated.ValueXY()).current;
-  const actionInProgress = useRef(false);
+  const [cardPosition] = useState(() => new Animated.ValueXY());
+  const [actionInProgress] = useState(() => createActionLock());
 
   const loadCards = useCallback(async () => {
     setLoading(true);
@@ -45,8 +59,7 @@ export default function CardsScreen() {
   const currentCard = cards[0];
 
   const finishSwipe = useCallback(async (direction: 'left' | 'right') => {
-    if (!currentCard || actionInProgress.current) return;
-    actionInProgress.current = true;
+    if (!currentCard || !actionInProgress.acquire()) return;
     const cardId = currentCard.id;
 
     try {
@@ -76,9 +89,9 @@ export default function CardsScreen() {
       setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar a fila.');
     } finally {
       cardPosition.setValue({ x: 0, y: 0 });
-      actionInProgress.current = false;
+      actionInProgress.release();
     }
-  }, [cardPosition, currentCard, db, width]);
+  }, [actionInProgress, cardPosition, currentCard, db, width]);
 
   const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_event, gesture) => (

@@ -298,7 +298,6 @@ export async function syncLibrary(db: SQLiteDatabase): Promise<SyncResult> {
 
   let remoteBooks = await request<RemoteBook[]>(session, '/books');
   const localBooks = await listBooks(db);
-  const localBooksById = new Map(localBooks.map((book) => [book.id, book]));
   const localBookByRemoteId = new Map<string, Book>();
   let syncedBooks = 0;
 
@@ -458,5 +457,4 @@ async function pushLocalCardWithBook(
 
   return saved;
 }
-
 

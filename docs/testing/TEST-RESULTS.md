@@ -226,4 +226,19 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Resultado: PASS; total=20, pass=20, failures=0, errors=0, skipped=0, exit code=0.
 - Surefire: 15 relatórios em `backend/target/surefire-reports/`, agregação confirmada pelos XMLs.
 - Verificações: `BookServiceTest` permanece com `@TempDir`; não há referência hardcoded adicional a `data/library` nos testes; `backend/data/library` não foi usado nem alterado.
-- TEST IDs: nenhum promovido; TEST-001–TEST-060 permanecem `NOT_RUN`.
+- TEST IDs: nenhum TEST adicional foi promovido nesta etapa backend; TEST-012 e TEST-026 permanecem `PASS` desde a Wave 0; todos os demais permanecem `NOT_RUN`, salvo evidência futura explícita.
+
+## Wave 0 — Final verification
+
+- Commit SHA verificado: 7ee525f26a7e75119c380b05f459d0fda787cd0d.
+- Data/hora UTC: 2026-09-14T23:13:19Z.
+- Ambiente: Windows 11 amd64; Java 21.0.6; Maven 3.8.1; Node v26.8.1; npm 11.19.0. Nenhuma dependência ou lockfile foi alterada.
+- Backend build: `PASS` — `cd backend; mvn -q -DskipTests package`; exit code 0.
+- Backend tests: `PASS` — `cd backend; mvn -q test`; exit code 0; 20 testes executados, 20 pass, 0 failures, 0 errors, 0 skipped; 15 relatórios Surefire. Profile `test` ativo, datasource `jdbc:postgresql://127.0.0.1:5432/leitor_test`, schema `public`, usuário `leitor_test_user`; database confirmado diferente de `leitor` antes da execução.
+- Frontend build: `PASS` — `cd frontend; npm run build`; exit code 0. Vite emitiu somente o aviso existente de chunk maior que 500 kB.
+- Frontend static tests: `PASS` — `cd frontend; node --test book-upload.test.mjs card-creation.test.mjs lexicon-entry-contract.test.mjs lexicon-lookup.test.mjs lexicon-start.test.mjs`; exit code 0; 5 testes pass, 0 fail, 0 skipped; duração 380.25 ms.
+- Mobile Jest: `PASS` — `cd leitor-epub; npm test -- --runInBand`; exit code 0; 10 suites pass, 41 testes pass, 0 fail, 0 skipped; duração 5.252 s.
+- Mobile typecheck: `PASS` — `cd leitor-epub; npm run typecheck`; exit code 0; nenhum erro.
+- Mobile lint: `PASS` — `cd leitor-epub; npm run lint`; exit code 0; 0 errors, 0 warnings. O artefato gerado `.expo/types/router.d.ts` não foi editado; `.expo/**` foi apenas incluído no ignore do ESLint.
+- Filesystem: `BookServiceTest` mantém `@TempDir`; nenhum teste fonte referencia `data/library`; `backend/data/library` não foi usado nem alterado.
+- Escopo: nenhuma migration foi alterada; o Flyway apenas validou o schema isolado de `leitor_test`. Produção, segredo, Playwright, E2E e TEST planejado não foram alterados/executados. TEST-012 e TEST-026 permanecem `PASS`; todos os demais TEST IDs permanecem `NOT_RUN`.
