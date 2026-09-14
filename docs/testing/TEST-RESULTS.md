@@ -1,0 +1,127 @@
+# Test Execution Results
+
+Baseline commit: f7eb4fed6dfd3a813be2de225312cd7f78bd799b
+Data/hora UTC: 2026-09-14T17:24:32Z
+Ambiente: Windows 11 amd64; Java 21.0.6; Maven 3.8.1; Node v26.8.1; npm 11.19.0.
+
+Identidade Git e versões registradas antes das suítes:
+
+- git rev-parse HEAD: f7eb4fed6dfd3a813be2de225312cd7f78bd799b
+- git status --short antes da execução: vazio; árvore de trabalho limpa.
+- java -version: Java 21.0.6 LTS.
+- mvn -version: Apache Maven 3.8.1; Java 21.0.6; Windows 11 amd64.
+- node -v: v26.8.1.
+- npm -v: 11.19.0.
+
+Banco — preflight de segurança (nenhum teste backend foi executado contra ele):
+
+- Host/porta observados: localhost/127.0.0.1:5432; listener local PostgreSQL, PID 11020.
+- Database configurado: leitor. Schema efetivamente usado: não confirmado.
+- Isolamento/reset: não confirmado. O Docker daemon estava indisponível; a configuração Compose observada usa volume persistente leitor-postgres-data. Nenhum reset, DROP ou TRUNCATE foi executado.
+- Storage-directory configurado/observado: backend/data/library. Não foi limpo nem alterado.
+- A consulta de metadados com psql não autenticou; portanto não foi possível provar que o alvo era descartável ou separado da base de desenvolvimento.
+- Senhas e tokens não são registrados.
+
+## Wave 0 — Baseline
+
+| Gate | Status | Command | Evidence |
+|---|---|---|---|
+| Backend build | PASS | cd backend; mvn -q -DskipTests package | Exit code 0; build concluído sem saída de erro. |
+| Backend tests | BLOCKED | cd backend; mvn -q test | Não executado: a pré-condição de isolamento PostgreSQL falhou. A suíte contém testes Spring/JDBC que podem alcançar o datasource; nenhuma operação de banco foi feita. |
+| Frontend build | PASS | cd frontend; npm run build | Exit code 0; tsc -b e Vite concluídos; 43 módulos transformados. Warning relevante: chunk JavaScript de 939.44 kB acima do limite de 500 kB. |
+| Frontend static tests | PASS | cd frontend; node --test book-upload.test.mjs card-creation.test.mjs lexicon-entry-contract.test.mjs lexicon-lookup.test.mjs lexicon-start.test.mjs | Exit code 0; 5 testes, 5 pass, 0 fail, 0 skipped, duração 163.9229 ms. frontend/src/bookDetails.test.ts não foi executado. |
+| Mobile Jest | PASS | cd leitor-epub; npm test -- --runInBand | Exit code 0; 10 suites pass, 41 testes pass, 0 fail, 0 skipped; tempo Jest 5.31 s. |
+| Mobile typecheck | PASS | cd leitor-epub; npm run typecheck | Exit code 0; tsc --noEmit concluído sem saída de erro. |
+| Mobile lint | FAIL | cd leitor-epub; npm run lint | Exit code 1; 6 errors e 2 warnings. Evidência e investigação abaixo. |
+
+## Investigação de falha — systematic-debugging
+
+Nenhuma correção foi aplicada. A investigação ficou limitada a ler a saída completa, reproduzir o comando e conferir configuração/trechos envolvidos.
+
+### Mobile lint
+
+- Comando: cd leitor-epub; npm run lint
+- Exit code: 1
+- Configuração/versões confirmadas: eslint.config.js carrega eslint-config-expo/flat; ESLint 9.39.5; eslint-config-expo 57.0.2; React 19.2.3; TypeScript 6.0.3.
+- Primeira divergência observada: app/_layout.tsx:49, regra react-hooks/set-state-in-effect, por setReady(false) síncrono dentro de useEffect.
+- Outros erros: app/cards.tsx:83, regra react-hooks/refs, ao criar PanResponder com cardPosition; app/cards.tsx:142 e :144, acessos a getTranslateTransform(), cardPosition.x e interpolate() durante render. A saída reportou 6 erros no total.
+- Warnings: .expo/types/router.d.ts:1, diretiva eslint-disable sem problemas correspondentes; src/services/sync.ts:301, localBooksById atribuído e não usado.
+- Hipótese de causa: as regras atuais do preset Expo/React Hooks detectam padrões existentes de efeitos, refs e Animated/PanResponder; a causa não foi alterada nesta Wave.
+- Impacto: o gate de lint permanece FAIL e a prontidão de qualidade do mobile fica pendente. Nenhum teste, produção ou configuração foi modificado.
+
+## Bloqueio de segurança — backend tests
+
+O gate cd backend; mvn -q test não foi iniciado. A porta 5432 estava ocupada por um PostgreSQL local, mas a identidade do database/schema e a separação em relação à base de desenvolvimento não puderam ser confirmadas. O Docker client estava instalado, porém o daemon não estava disponível. Como a configuração Compose observada utiliza armazenamento persistente, não foi seguro improvisar reset nem executar a suíte contra esse alvo. O próximo passo deve ser uma decisão/preparação explícita de banco isolado antes de repetir o gate.
+
+## TEST IDs
+
+Status inicial da Wave 0: NOT_RUN para todos os TEST IDs, exceto os dois itens EXISTING abaixo, que foram executados integralmente com evidência fresca pela suíte Jest verde.
+
+| TEST ID | Status | Evidence |
+|---|---|---|
+| TEST-001 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-002 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-003 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-004 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-005 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-006 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-007 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-008 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-009 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-010 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-011 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-012 | PASS | Existing Coverage confirmada em leitor-epub/src/db/migrations.test.ts; incluído na execução Jest com 10 suites e 41 testes pass. |
+| TEST-013 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-014 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-015 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-016 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-017 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-018 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-019 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-020 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-021 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-022 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-023 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-024 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-025 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-026 | PASS | Existing Coverage confirmada em leitor-epub/src/reader/progress.test.ts e readerBridge.test.ts; incluído na execução Jest com 10 suites e 41 testes pass. |
+| TEST-027 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-028 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-029 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-030 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-031 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-032 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-033 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-034 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-035 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-036 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-037 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-038 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-039 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-040 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-041 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-042 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-043 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-044 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-045 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-046 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-047 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-048 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-049 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-050 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-051 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-052 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-053 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-054 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-055 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-056 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-057 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-058 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-059 | NOT_RUN | Não executado nesta Wave 0. |
+| TEST-060 | NOT_RUN | Não executado nesta Wave 0. |
+
+## Escopo encerrado
+
+Somente este arquivo de resultados foi criado intencionalmente. Nenhum código de produção, teste, migration, fixture, banco, configuração versionada ou issue Linear foi alterado. Playwright, E2E web, E2E mobile e device não foram executados. A Wave 1 não foi iniciada.
+
+git status --short ao final: ?? docs/testing/TEST-RESULTS.md. Comparado ao estado inicial limpo, esta é a única alteração intencional.
