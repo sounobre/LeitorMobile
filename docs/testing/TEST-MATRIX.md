@@ -176,14 +176,14 @@ Existing tests:
 - `backend/src/test/java/br/com/leitormobile/auth/SecurityConfigTest.java`
 
 Automation status:
-EXISTING
+AUTOMATABLE_NOW
 
 Evidence:
 - `backend/src/main/java/br/com/leitormobile/auth/SecurityConfig.java`
 - `backend/src/main/java/br/com/leitormobile/auth/AuthFilter.java`
 
 Notes:
-Este teste cobre a fronteira backend, não o armazenamento de sessão no mobile.
+SecurityConfigTest cobre somente o GET não autenticado; requests com token malformado/expirado e a ausência de acesso autenticado ainda precisam ser ampliados neste TEST.
 ## TEST-004 — Login mobile persiste sessão antes da área principal
 
 Purpose:
@@ -811,7 +811,7 @@ Evidence:
 Notes:
  O reprocessamento com `force=true` é cenário separado em TEST-045.
 
-## TEST-014 — Contrato de criação web rejeita duplicidade e hash divergente
+## TEST-014 — Contrato de criação web do registro e fileHash
 
 Purpose:
 CONTRACT
@@ -838,14 +838,14 @@ Preconditions:
 Backend com owner autenticado e livro existente por hash.
 
 Test data:
-Request válido, request com campos normalizáveis, hash duplicado e hash divergente do conteúdo futuro.
+Request válido, campos obrigatórios ausentes, campos normalizáveis, fileHash duplicado e ownership/autorização inválida.
 
 Steps:
 1. Enviar requests de criação com os dados de cada fixture.
-2. Observar entidade criada, normalização e conflito.
+2. Observar entidade criada, campos obrigatórios, normalização/defaults e conflito de fileHash.
 
 Expected:
-Request válido cria registro do owner; campos textuais seguem normalização observada; hash duplicado é rejeitado conforme contrato e hash divergente não deve ser aceito como conteúdo correspondente.
+Request válido cria registro do owner; campos obrigatórios, normalizações/defaults, ownership e duplicidade de fileHash seguem o contrato de API-004. A comparação entre fileHash e SHA-256 do EPUB pertence ao upload de API-005.
 
 Expected Basis:
 - API_CONTRACT
@@ -866,7 +866,7 @@ Evidence:
 - `docs/system/API-CATALOG.md`
 
 Notes:
-Não fixar código de erro ou mensagem sem evidência adicional do catálogo/execução.
+API-004 recebe o fileHash informado no registro; não recebe o EPUB e não detecta divergência de SHA-256 do conteúdo. Não fixar código de erro ou mensagem sem evidência adicional do catálogo/execução.
 ## TEST-015 — Upload web valida ownership, tamanho, hash e caminho
 
 Purpose:
@@ -894,14 +894,15 @@ Preconditions:
 Livro criado para o owner autenticado e storage backend controlável.
 
 Test data:
-EPUB válido, arquivo acima de 100 MB, hash divergente, arquivo ausente, owner diferente e caminho fora da raiz permitida.
+EPUB válido com SHA-256 correspondente ao fileHash persistido, EPUB com SHA-256 divergente, arquivo acima de 100 MB, arquivo ausente, owner diferente e caminho fora da raiz permitida.
 
 Steps:
 1. Enviar cada variante para `POST /api/books/{id}/content`.
-2. Verificar resposta, existência do arquivo gerenciado e isolamento do owner.
+2. Calcular/observar o SHA-256 do EPUB e compará-lo ao fileHash persistido.
+3. Verificar resposta, existência do arquivo gerenciado e isolamento do owner.
 
 Expected:
-Upload válido armazena o conteúdo permitido; tamanho/hash/path/ownership inválidos são rejeitados conforme o contrato observado e não confirmam o armazenamento daquele conteúdo.
+Upload válido cujo SHA-256 corresponde ao fileHash persistido armazena o conteúdo permitido; tamanho, SHA-256 divergente, path e ownership inválidos são rejeitados conforme o contrato observado e não confirmam o armazenamento daquele conteúdo.
 
 Expected Basis:
 - API_CONTRACT
@@ -1093,14 +1094,14 @@ Existing tests:
 - `leitor-epub/src/services/epubSecurity.test.ts`
 
 Automation status:
-EXISTING
+AUTOMATABLE_NOW
 
 Evidence:
 - `leitor-epub/src/services/epubImport.ts`
 - `leitor-epub/src/services/epubSecurity.ts`
 
 Notes:
-O teste não valida a UI nem a cópia em filesystem real.
+Os testes existentes cobrem casos representativos de validação, mas não todos os artefatos inválidos descritos (por exemplo, variantes de ZIP/CRC, estruturas ausentes e limites); ampliar as fixtures sem transformar lacunas em contrato não demonstrado.
 
 ## TEST-019 — Importação mobile evita duplicidade e limpa cópia parcial
 
@@ -1263,7 +1264,7 @@ Existing tests:
 - `backend/src/test/java/br/com/leitormobile/book/BookServiceTest.java`
 
 Automation status:
-EXISTING
+AUTOMATABLE_NOW
 
 Evidence:
 - `backend/src/main/java/br/com/leitormobile/book/BookController.java`
@@ -1271,7 +1272,7 @@ Evidence:
 - `docs/system/API-CATALOG.md`
 
 Notes:
-O teste existente cobre path externo e remoção; ownership/HTTP devem ser completados.
+BookServiceTest cobre remoção no service e path externo; ownership, ausência de autenticação e contrato HTTP ainda precisam ser ampliados neste TEST.
 
 ## TEST-022 — Exclusão local mobile remove registro e arquivos
 
@@ -1759,7 +1760,7 @@ Existing tests:
 - frontend/lexicon-entry-contract.test.mjs — RELATED, teste estático de contrato; não é E2E.
 
 Automation status:
-- EXISTING
+- REQUIRES_INFRASTRUCTURE
 
 Evidence:
 - frontend/lexicon-entry-contract.test.mjs.
@@ -1767,7 +1768,7 @@ Evidence:
 - docs/system/API-CATALOG.md — API-019.
 
 Notes:
-- O arquivo referenciado existe fisicamente na baseline.
+- O teste existente é contrato estático de fonte; renderização do componente, estados opcionais e assertions de COMPONENT ainda precisam ser ampliados.
 
 ## TEST-030 — Lookup de dicionário mobile com cache e fallback externo
 Purpose:
@@ -2256,14 +2257,14 @@ Existing tests:
 - leitor-epub/src/db/repository.test.ts
 
 Automation status:
-- EXISTING
+- AUTOMATABLE_NOW
 
 Evidence:
 - docs/codebase/TESTING.md.
 - leitor-epub/src/db/repository.ts e repository.test.ts.
 
 Notes:
-- Não classificar esta unidade como E2E.
+- repository.test.ts cobre insert/update parametrizados; read/remove e IDs inexistentes ainda precisam ser ampliados neste TEST. Não classificar esta unidade como E2E.
 
 ## TEST-038 — Bookmark mobile alterna e é reencontrado
 Purpose:
@@ -2326,7 +2327,7 @@ Evidence:
 
 Notes:
 - A baseline não fornece evidência automatizada para esta journey.
-## TEST-039 — Ciclo web de cards: listar, editar, arquivar e reordenar
+## TEST-039 — Ciclo web de cards: listar, editar, arquivar e mover ao fim
 Purpose:
 ACCEPTANCE
 
@@ -2362,13 +2363,13 @@ Test data:
 Steps:
 1. Listar cards.
 2. Editar um card próprio.
-3. Arquivar e desarquivar.
-4. Mover um card para o fim e recarregar a lista.
+3. Arquivar um card próprio.
+4. Mover um card próprio para o fim e recarregar a lista.
 5. Observar ownership e persistência.
 
 Expected:
 - Operações permitidas alteram apenas o card próprio e persistem conforme os contratos das rotas.
-- Arquivamento e ordenação observados permanecem coerentes após recarregar.
+- Arquivamento e movimento para o fim permanecem coerentes após recarregar.
 - Casos de recurso ausente ou de outro usuário seguem o contrato sem expor dados.
 
 Expected Basis:
@@ -2426,14 +2427,14 @@ Preconditions:
 Test data:
 - Payload de card válido e inválido.
 - IDs ausentes.
-- Transições repetidas de archive/unarchive.
+- Transições de archive.
 - Card de outro owner.
 
 Steps:
 1. Listar cards com cada usuário.
-2. Criar/editar card com payloads válidos e inválidos.
-3. Arquivar, desarquivar e mover cards próprios.
-4. Repetir operações em cards ausentes ou alheios.
+2. Editar card com payloads válidos e inválidos.
+3. Arquivar e mover ao final cards próprios.
+4. Repetir listagem/mutação em cards ausentes ou alheios.
 5. Verificar dados retornados e persistência.
 
 Expected:
@@ -2864,7 +2865,7 @@ Existing tests:
 - backend/src/test/java/br/com/leitormobile/lexicon/LexiconJobRecoveryTest.java
 
 Automation status:
-- EXISTING
+- REQUIRES_INFRASTRUCTURE
 
 Evidence:
 - docs/codebase/TESTING.md.
@@ -2872,7 +2873,7 @@ Evidence:
 - backend/src/main/java/br/com/leitormobile/lexicon.
 
 Notes:
-- A execução de job real com provedores externos continua fora desta matriz de testes existentes.
+- Os testes existentes cobrem reutilização/force e recovery unitário; persistência completa, latest status, estados running/failed e integração do runner ainda precisam ser ampliados neste TEST.
 
 ## TEST-047 — Contrato de lista e lookup lexical persistido
 Purpose:
@@ -3120,7 +3121,7 @@ Existing tests:
 - leitor-epub/src/services/backupValidation.test.ts
 
 Automation status:
-- EXISTING
+- AUTOMATABLE_NOW
 
 Evidence:
 - docs/system/USER-JOURNEYS.md — FLOW-021.
@@ -3128,7 +3129,7 @@ Evidence:
 - leitor-epub/src/services/backupValidation.ts e backupValidation.test.ts.
 
 Notes:
-- O teste existente é unitário, não E2E_MOBILE.
+- backupValidation.test.ts cobre paths inseguros, referências a livro ausente e snapshot vazio; parsing de artefatos inválidos e a sequência de restore ainda precisam ser ampliados neste TEST. O teste existente é unitário, não E2E_MOBILE.
 
 ## TEST-051 — Restore mobile substitui snapshot e arquivos locais
 Purpose:
@@ -3194,7 +3195,7 @@ Evidence:
 Notes:
 - Requer dispositivo ou infraestrutura capaz de controlar filesystem local real.
 
-## TEST-052 — Links externos mobile usam allowlist e abrem no OS
+## TEST-052 — Links externos mobile usam schemes suportados e abrem no OS
 Purpose:
 ACCEPTANCE
 
@@ -3221,8 +3222,8 @@ Preconditions:
 - Dispositivo com handler de URL.
 
 Test data:
-- Link HTTPS permitido.
-- Link para domínio não permitido.
+- Links http, https, mailto e tel.
+- Links javascript:, data:, file: e esquema customizado.
 - Link relativo e texto sem URL.
 
 Steps:
@@ -3231,8 +3232,8 @@ Steps:
 3. Retornar ao app e verificar que a leitura permanece íntegra.
 
 Expected:
-- Somente esquemas/domínios permitidos pela implementação são encaminhados ao OS.
-- Links não permitidos não são abertos.
+- Somente schemes/protocolos suportados pela implementação são encaminhados ao OS.
+- Schemes/protocolos não suportados não são abertos.
 - Nenhuma navegação externa deve corromper o estado local do livro.
 
 Expected Basis:
@@ -3257,7 +3258,7 @@ Evidence:
 Notes:
 - epubSecurity.test.ts valida importação/segurança de EPUB, não conta como cobertura desta journey.
 
-## TEST-053 — Links mobile com esquemas não suportados são bloqueados
+## TEST-053 — Links mobile com schemes não suportados são bloqueados
 Purpose:
 CONTRACT
 
@@ -3283,7 +3284,7 @@ Preconditions:
 - Handler de links isolável ou dispositivo configurado.
 
 Test data:
-- javascript:, data:, file:, esquema customizado e HTTPS permitido.
+- javascript:, data:, file:, esquema customizado, http, https, mailto e tel.
 
 Steps:
 1. Submeter cada esquema ao handler.
@@ -3291,8 +3292,8 @@ Steps:
 3. Registrar decisão para cada entrada.
 
 Expected:
-- Esquemas não suportados não são encaminhados ao OS.
-- O esquema permitido segue o caminho atual documentado.
+- Schemes/protocolos não suportados não são encaminhados ao OS.
+- http, https, mailto e tel seguem o caminho suportado observado na implementação.
 - Não atribuir ao teste epubSecurity uma cobertura que ele não possui.
 
 Expected Basis:
@@ -3314,7 +3315,7 @@ Evidence:
 - docs/system/USER-JOURNEYS.md — FLOW-022.
 
 Notes:
-- O conjunto exato de domínios permitidos deve ser obtido da implementação atual e da decisão de segurança.
+- O escopo deste teste é somente scheme/protocol; não inferir regras além da validação observada.
 ## TEST-054 — Startup semeia conta e recupera jobs interrompidos
 Purpose:
 ACCEPTANCE
@@ -3631,7 +3632,7 @@ Existing tests:
 - backend/src/test/java/br/com/leitormobile/ai/ExternalAiExposurePolicyTest.java
 
 Automation status:
-- EXISTING
+- AUTOMATABLE_NOW
 
 Evidence:
 - docs/codebase/TESTING.md.
@@ -3639,7 +3640,7 @@ Evidence:
 - backend/src/main/java/br/com/leitormobile/ai.
 
 Notes:
-- Ollama não corresponde a uma API-001–API-021 do catálogo público.
+- Os testes existentes cobrem timeout do Ollama e policies de contexto/exposição; resposta válida completa e o contrato integrado do provider ainda precisam ser ampliados neste TEST. Ollama não corresponde a uma API-001–API-021 do catálogo público.
 
 ## TEST-059 — Caracterização de no-candidate e exposição de IA
 Purpose:
@@ -3694,7 +3695,7 @@ Existing tests:
 - backend/src/test/java/br/com/leitormobile/ai/ExternalAiContextPolicyTest.java — RELATED.
 
 Automation status:
-- EXISTING
+- AUTOMATABLE_NOW
 
 Evidence:
 - docs/codebase/CONCERNS.md.
@@ -3702,7 +3703,7 @@ Evidence:
 - docs/system/USER-JOURNEYS.md — FLOW-025.
 
 Notes:
-- Resultado de caracterização deve permanecer separado de requisito de produto.
+- Os testes existentes cobrem exposure/context policy; o caminho de no-candidate e sua decisão sobre chamar o provider ainda precisam ser ampliados neste TEST. Resultado de caracterização deve permanecer separado de requisito de produto.
 
 ## TEST-060 — Contrato de health e info do actuator
 Purpose:
@@ -3806,12 +3807,26 @@ Por superfície:
 
 Por automação:
 
-- EXISTING: 11.
-- AUTOMATABLE_NOW: 10.
-- REQUIRES_INFRASTRUCTURE: 17.
+- EXISTING: 2.
+- AUTOMATABLE_NOW: 17.
+- REQUIRES_INFRASTRUCTURE: 19.
 - REQUIRES_DEVICE: 17.
 - BLOCKED_BY_INTENT: 5.
 - MANUAL_ONLY: 0.
+
+### Existing tests requiring extension
+
+| TEST | Existing test | Missing coverage |
+|---|---|---|
+| TEST-003 | backend/src/test/java/br/com/leitormobile/auth/SecurityConfigTest.java | O teste cobre apenas GET /api/books sem autenticação; faltam token malformado/expirado e a confirmação dos demais casos previstos. |
+| TEST-018 | leitor-epub/src/services/epubImport.test.ts; leitor-epub/src/services/epubSecurity.test.ts | Há casos representativos de estrutura, layout fixo, recurso remoto, encryption e path; faltam ampliar ZIP/CRC, estruturas ausentes e limites listados no cenário. |
+| TEST-021 | backend/src/test/java/br/com/leitormobile/book/BookServiceTest.java | Cobre remoção no service e path externo; faltam ownership, ausência de autenticação e contrato HTTP. |
+| TEST-029 | frontend/lexicon-entry-contract.test.mjs | É contrato estático de fonte; faltam renderização do componente, estados opcionais e assertions de COMPONENT. |
+| TEST-037 | leitor-epub/src/db/repository.test.ts | Cobre insert/update parametrizados; faltam read/remove e IDs inexistentes. |
+| TEST-046 | backend/src/test/java/br/com/leitormobile/lexicon/LexiconServiceTest.java; backend/src/test/java/br/com/leitormobile/lexicon/LexiconJobRecoveryTest.java | Cobre reutilização/force e recovery unitário; faltam persistência completa, latest status, estados running/failed e integração do runner. |
+| TEST-050 | leitor-epub/src/services/backupValidation.test.ts | Cobre paths inseguros, referências a livro ausente e snapshot vazio; faltam parsing de artefatos inválidos e sequência de restore. |
+| TEST-058 | backend/src/test/java/br/com/leitormobile/ai/OllamaAiProviderTest.java; backend/src/test/java/br/com/leitormobile/ai/ExternalAiContextPolicyTest.java; backend/src/test/java/br/com/leitormobile/ai/ExternalAiExposurePolicyTest.java | Cobre timeout do Ollama e policies de contexto/exposição; falta resposta válida completa e contrato integrado do provider. |
+| TEST-059 | backend/src/test/java/br/com/leitormobile/ai/ExternalAiExposurePolicyTest.java; backend/src/test/java/br/com/leitormobile/ai/ExternalAiContextPolicyTest.java | Cobre exposure/context policy; falta o caminho de no-candidate e a decisão sobre chamar o provider. |
 
 ### Cobertura existente das journeys
 
@@ -3856,6 +3871,7 @@ A matriz cobre todos os FLOW-001–FLOW-027 e CAP-001–CAP-025. Todas as API-00
 - Nenhum teste estático foi classificado como E2E.
 - Nenhum comportamento UNKNOWN_INTENT ou BUG_CANDIDATE foi transformado em expected normativo.
 - Nenhum teste, fixture, código de produção, banco ou migration foi criado ou executado nesta etapa.
+- Automation status EXISTING só permanece quando a automação física cobre o cenário completo; coberturas parciais foram reclassificadas e listadas em “Existing tests requiring extension”.
 
 ## Summary Table
 
@@ -3863,7 +3879,7 @@ A matriz cobre todos os FLOW-001–FLOW-027 e CAP-001–CAP-025. Todas as API-00
 |---|---|---|---|---|---|---|---|---|
 | TEST-001 | ACCEPTANCE | P0 | E2E_WEB | WEB | FLOW-001 | CAP-001,CAP-003 | API-001,API-002,API-003 | REQUIRES_INFRASTRUCTURE |
 | TEST-002 | ACCEPTANCE | P0 | API | BACKEND | FLOW-001 | CAP-001 | API-001 | AUTOMATABLE_NOW |
-| TEST-003 | CONTRACT | P0 | API | BACKEND | FLOW-001 | CAP-001,CAP-003 | API-003 | EXISTING |
+| TEST-003 | CONTRACT | P0 | API | BACKEND | FLOW-001 | CAP-001,CAP-003 | API-003 | AUTOMATABLE_NOW |
 | TEST-004 | ACCEPTANCE | P0 | E2E_MOBILE | MOBILE | FLOW-002 | CAP-001 | API-001 | REQUIRES_DEVICE |
 | TEST-005 | CHARACTERIZATION | P0 | INTEGRATION | CROSS-SURFACE | FLOW-002,FLOW-018 | CAP-001,CAP-022 | API-001,API-003,API-004,API-005,API-008,API-010,API-011,API-012,API-013,API-014,API-015,API-016,API-017,API-018 | REQUIRES_INFRASTRUCTURE |
 | TEST-006 | INTENT_REQUIRED | P0 | INTEGRATION | CROSS-SURFACE | FLOW-002,FLOW-018 | CAP-004,CAP-010,CAP-017,CAP-018,CAP-022 | API-003,API-008,API-010,API-011,API-012,API-013,API-014,API-015 | BLOCKED_BY_INTENT |
@@ -3878,10 +3894,10 @@ A matriz cobre todos os FLOW-001–FLOW-027 e CAP-001–CAP-025. Todas as API-00
 | TEST-015 | CONTRACT | P0 | API | BACKEND | FLOW-005 | CAP-005 | API-005 | AUTOMATABLE_NOW |
 | TEST-016 | INTENT_REQUIRED | P1 | INTEGRATION | CROSS-SURFACE | FLOW-005,FLOW-006 | CAP-005,CAP-006 | API-005 | BLOCKED_BY_INTENT |
 | TEST-017 | ACCEPTANCE | P1 | E2E_MOBILE | MOBILE | FLOW-006 | CAP-004,CAP-006 | NONE | REQUIRES_DEVICE |
-| TEST-018 | ACCEPTANCE | P0 | UNIT | MOBILE | FLOW-006 | CAP-006 | NONE | EXISTING |
+| TEST-018 | ACCEPTANCE | P0 | UNIT | MOBILE | FLOW-006 | CAP-006 | NONE | AUTOMATABLE_NOW |
 | TEST-019 | CONTRACT | P1 | DEVICE | MOBILE | FLOW-006 | CAP-006 | NONE | REQUIRES_DEVICE |
 | TEST-020 | ACCEPTANCE | P0 | E2E_WEB | WEB | FLOW-007 | CAP-007 | API-009 | REQUIRES_INFRASTRUCTURE |
-| TEST-021 | CONTRACT | P0 | API | BACKEND | FLOW-007 | CAP-007 | API-009 | EXISTING |
+| TEST-021 | CONTRACT | P0 | API | BACKEND | FLOW-007 | CAP-007 | API-009 | AUTOMATABLE_NOW |
 | TEST-022 | ACCEPTANCE | P0 | E2E_MOBILE | MOBILE | FLOW-027 | CAP-007 | NONE | REQUIRES_DEVICE |
 | TEST-023 | ACCEPTANCE | P0 | E2E_WEB | WEB | FLOW-008 | CAP-008,CAP-010 | API-006,API-008 | REQUIRES_INFRASTRUCTURE |
 | TEST-024 | CONTRACT | P0 | API | BACKEND | FLOW-008 | CAP-008,CAP-010 | API-006,API-008 | AUTOMATABLE_NOW |
@@ -3889,7 +3905,7 @@ A matriz cobre todos os FLOW-001–FLOW-027 e CAP-001–CAP-025. Todas as API-00
 | TEST-026 | CONTRACT | P1 | UNIT | MOBILE | FLOW-009 | CAP-009,CAP-010 | NONE | EXISTING |
 | TEST-027 | ACCEPTANCE | P1 | E2E_WEB | WEB | FLOW-010 | CAP-014,CAP-016 | API-019 | REQUIRES_INFRASTRUCTURE |
 | TEST-028 | ACCEPTANCE | P1 | E2E_WEB | WEB | FLOW-010 | CAP-014,CAP-017 | API-011,API-019 | REQUIRES_INFRASTRUCTURE |
-| TEST-029 | CONTRACT | P1 | COMPONENT | WEB | FLOW-010 | CAP-016 | API-019 | EXISTING |
+| TEST-029 | CONTRACT | P1 | COMPONENT | WEB | FLOW-010 | CAP-016 | API-019 | REQUIRES_INFRASTRUCTURE |
 | TEST-030 | ACCEPTANCE | P1 | E2E_MOBILE | MOBILE | FLOW-011 | CAP-014,CAP-016 | OUT-001 | REQUIRES_DEVICE |
 | TEST-031 | CONTRACT | P1 | API | MOBILE | FLOW-011 | CAP-016 | OUT-001 | AUTOMATABLE_NOW |
 | TEST-032 | ACCEPTANCE | P2 | DEVICE | MOBILE | FLOW-012 | CAP-014,CAP-015 | NONE | REQUIRES_DEVICE |
@@ -3897,7 +3913,7 @@ A matriz cobre todos os FLOW-001–FLOW-027 e CAP-001–CAP-025. Todas as API-00
 | TEST-034 | ACCEPTANCE | P1 | E2E_MOBILE | MOBILE | FLOW-013 | CAP-014,CAP-017 | NONE | REQUIRES_DEVICE |
 | TEST-035 | CONTRACT | P1 | COMPONENT | MOBILE | FLOW-013 | CAP-017 | NONE | AUTOMATABLE_NOW |
 | TEST-036 | ACCEPTANCE | P1 | E2E_MOBILE | MOBILE | FLOW-014 | CAP-013,CAP-014 | NONE | REQUIRES_DEVICE |
-| TEST-037 | CONTRACT | P1 | UNIT | MOBILE | FLOW-014 | CAP-013 | NONE | EXISTING |
+| TEST-037 | CONTRACT | P1 | UNIT | MOBILE | FLOW-014 | CAP-013 | NONE | AUTOMATABLE_NOW |
 | TEST-038 | ACCEPTANCE | P1 | E2E_MOBILE | MOBILE | FLOW-015 | CAP-009,CAP-011 | NONE | REQUIRES_DEVICE |
 | TEST-039 | ACCEPTANCE | P1 | E2E_WEB | WEB | FLOW-016 | CAP-018 | API-010,API-012,API-013,API-015 | REQUIRES_INFRASTRUCTURE |
 | TEST-040 | CONTRACT | P0 | API | BACKEND | FLOW-016 | CAP-018 | API-010,API-012,API-013,API-015 | AUTOMATABLE_NOW |
@@ -3906,11 +3922,11 @@ A matriz cobre todos os FLOW-001–FLOW-027 e CAP-001–CAP-025. Todas as API-00
 | TEST-043 | ACCEPTANCE | P1 | E2E_MOBILE | MOBILE | FLOW-017 | CAP-018 | NONE | REQUIRES_DEVICE |
 | TEST-044 | CHARACTERIZATION | P0 | INTEGRATION | CROSS-SURFACE | FLOW-018 | CAP-004,CAP-010,CAP-017,CAP-018,CAP-019,CAP-022 | API-003,API-004,API-005,API-008,API-010,API-011,API-012,API-013,API-014,API-015,API-016,API-017,API-018 | REQUIRES_INFRASTRUCTURE |
 | TEST-045 | ACCEPTANCE | P1 | INTEGRATION | CROSS-SURFACE | FLOW-019 | CAP-016,CAP-019 | API-016,API-017 | REQUIRES_INFRASTRUCTURE |
-| TEST-046 | CONTRACT | P1 | INTEGRATION | BACKEND | FLOW-019,FLOW-023 | CAP-016,CAP-019 | API-016,API-017 | EXISTING |
+| TEST-046 | CONTRACT | P1 | INTEGRATION | BACKEND | FLOW-019,FLOW-023 | CAP-016,CAP-019 | API-016,API-017 | REQUIRES_INFRASTRUCTURE |
 | TEST-047 | CONTRACT | P1 | API | BACKEND | FLOW-019 | CAP-016,CAP-019 | API-018,API-019 | AUTOMATABLE_NOW |
 | TEST-048 | ACCEPTANCE | P1 | E2E_MOBILE | MOBILE | FLOW-020 | CAP-023 | NONE | REQUIRES_DEVICE |
 | TEST-049 | CONTRACT | P1 | INTEGRATION | MOBILE | FLOW-020 | CAP-023 | NONE | REQUIRES_INFRASTRUCTURE |
-| TEST-050 | CONTRACT | P0 | UNIT | MOBILE | FLOW-021 | CAP-023 | NONE | EXISTING |
+| TEST-050 | CONTRACT | P0 | UNIT | MOBILE | FLOW-021 | CAP-023 | NONE | AUTOMATABLE_NOW |
 | TEST-051 | ACCEPTANCE | P0 | E2E_MOBILE | MOBILE | FLOW-021 | CAP-023 | NONE | REQUIRES_DEVICE |
 | TEST-052 | ACCEPTANCE | P2 | DEVICE | MOBILE | FLOW-022 | CAP-024 | NONE | REQUIRES_DEVICE |
 | TEST-053 | CONTRACT | P1 | DEVICE | MOBILE | FLOW-022 | CAP-024 | NONE | REQUIRES_DEVICE |
@@ -3918,8 +3934,8 @@ A matriz cobre todos os FLOW-001–FLOW-027 e CAP-001–CAP-025. Todas as API-00
 | TEST-055 | INTENT_REQUIRED | P1 | OPERATIONAL | BACKEND/OPERATOR | FLOW-023 | CAP-002 | NONE | BLOCKED_BY_INTENT |
 | TEST-056 | ACCEPTANCE | P2 | OPERATIONAL | BACKEND/OPERATOR | FLOW-024 | CAP-021 | NONE | REQUIRES_INFRASTRUCTURE |
 | TEST-057 | CONTRACT | P2 | OPERATIONAL | BACKEND/OPERATOR | FLOW-024 | CAP-021 | NONE | REQUIRES_INFRASTRUCTURE |
-| TEST-058 | CONTRACT | P1 | INTEGRATION | BACKEND/OPERATOR | FLOW-025 | CAP-020 | NONE | EXISTING |
-| TEST-059 | CHARACTERIZATION | P2 | OPERATIONAL | BACKEND/OPERATOR | FLOW-025 | CAP-019,CAP-020 | NONE | EXISTING |
+| TEST-058 | CONTRACT | P1 | INTEGRATION | BACKEND/OPERATOR | FLOW-025 | CAP-020 | NONE | AUTOMATABLE_NOW |
+| TEST-059 | CHARACTERIZATION | P2 | OPERATIONAL | BACKEND/OPERATOR | FLOW-025 | CAP-019,CAP-020 | NONE | AUTOMATABLE_NOW |
 | TEST-060 | CONTRACT | P2 | API | BACKEND/OPERATOR | FLOW-026 | CAP-025 | API-020,API-021 | AUTOMATABLE_NOW |
 
 ### Coverage by Journey
