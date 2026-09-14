@@ -6,7 +6,7 @@ Este documento reconstrói sequências observáveis a partir da implementação 
 
 Fontes: `docs/codebase/*`, `docs/system/SYSTEM-OVERVIEW.md`, `docs/system/CAPABILITIES.md`, `docs/system/API-CATALOG.md`, rotas/telas, clients HTTP, services, controllers, persistência e testes. README e documentação histórica não substituem a implementação. Quando a implementação existe mas a intenção não é demonstrável, isso aparece em `Status` ou `Unknowns`.
 
-`Tests` lista testes automatizados relacionados encontrados; a ausência de teste E2E não é tratada como ausência da capacidade.
+`Tests` lista testes automatizados relacionados encontrados. A classificação usada é `DIRECT` quando o teste executa ou valida diretamente código da superfície/caminho da journey, `RELATED` quando cobre uma unidade pertencente ao fluxo sem cobrir a jornada completa, e `NONE` quando não foi encontrado teste automatizado aplicável. `DIRECT` e `RELATED` não significam E2E: testes que apenas leem/inspecionam código são contratos estáticos, e nenhum teste estático é apresentado como E2E.
 
 ## FLOW-001 — Login web e abertura da biblioteca
 
@@ -59,7 +59,7 @@ Evidence:
 - `backend/src/main/java/br/com/leitormobile/auth/SecurityConfig.java`
 
 Tests:
-- `backend/src/test/java/br/com/leitormobile/auth/SecurityConfigTest.java` cobre regras relacionadas, mas não o login web completo.
+- RELATED — `backend/src/test/java/br/com/leitormobile/auth/SecurityConfigTest.java` valida a regra de autenticação da API; não executa `LoginView` nem o login web completo.
 
 Unknowns:
 - Nenhum além da cobertura de execução indicada.
@@ -128,7 +128,7 @@ Evidence:
 - `docs/system/API-CATALOG.md`
 
 Tests:
-- Não foi encontrado teste automatizado do login seguido de sync inicial.
+- NONE — Não foi encontrado teste automatizado do login seguido de sync inicial.
 
 Unknowns:
 - [ASK USER] O código não define fonte autoritativa de dados nem política de conflito local/remoto.
@@ -179,7 +179,7 @@ Evidence:
 - `backend/src/main/java/br/com/leitormobile/book/BookController.java`
 
 Tests:
-- Não foi encontrado teste da consulta bem-sucedida completa da UI web.
+- NONE — Não foi encontrado teste automatizado aplicável à consulta completa da UI web.
 
 Unknowns:
 - Nenhum.
@@ -229,7 +229,7 @@ Evidence:
 - `leitor-epub/src/db/migrations.ts`
 
 Tests:
-- `leitor-epub/src/db/migrations.test.ts` cobre migrations, não a renderização completa.
+- RELATED — `leitor-epub/src/db/migrations.test.ts` valida o esquema SQLite usado como pré-condição; não executa `listBooks` nem a renderização da biblioteca.
 
 Unknowns:
 - Nenhum.
@@ -259,23 +259,23 @@ Preconditions:
 - Sessão válida e arquivo EPUB aceito pelo fluxo web.
 
 Start:
-Usuário escolhe um EPUB no formulário de adição.
+Usuário confirma adicionar um EPUB no formulário de adição, após preencher os dados e escolher o arquivo.
 
 Steps:
 
 1. UI/entrada: frontend verifica extensão/tamanho e calcula SHA-256.
-2. API: cria livro com `POST /api/books`.
-3. API/persistência: envia conteúdo com `POST /api/books/{id}/content`; backend grava arquivo/registro.
-4. UI/API: usuário inicia job em `POST /api/books/{bookId}/lexicon/jobs`.
+2. API: frontend cria o livro com `POST /api/books`.
+3. API/persistência: frontend envia o conteúdo com `POST /api/books/{id}/content`; backend grava arquivo/registro.
+4. UI/API: após o upload bem-sucedido, frontend inicia automaticamente o processamento lexical com `POST /api/books/{bookId}/lexicon/jobs`; isso não é uma nova ação manual do usuário.
 5. Processo/persistência: runner assíncrono parseia EPUB e persiste unidades, sentenças, tokens, lexemas/formas e vínculos.
-6. UI/API: frontend consulta `GET /api/books/{bookId}/lexicon/jobs/latest` em polling.
+6. UI/API: frontend consulta `GET /api/books/{bookId}/lexicon/jobs/latest` em polling para acompanhar o job.
 7. API/UI: léxico disponível pode ser consultado em `GET /api/books/{bookId}/lexicon/lookup`.
 
 Expected observable result:
-Livro aparece, pode ser lido e o modal mostra o job; após sucesso, lookup lexical responde.
+Livro aparece, pode ser lido, o modal/polling mostra o estado do job iniciado automaticamente e, após sucesso, o lookup lexical responde.
 
 Alternative paths:
-- Processamento pode ser iniciado depois; job ativo pode ser reutilizado.
+- O upload pode concluir mesmo se o início automático do job falhar; reprocessamento explícito permanece uma ação manual separada em FLOW-019.
 - Lookup pode encontrar entrada, não encontrar ou indicar léxico não pronto.
 
 Failure paths:
@@ -295,10 +295,9 @@ Evidence:
 - `backend/src/main/java/br/com/leitormobile/lexicon/LexiconService.java`
 
 Tests:
-- `frontend/book-upload.test.mjs`
-- `frontend/src/bookDetails.test.ts`
-- `backend/src/test/java/br/com/leitormobile/lexicon/LexiconServiceTest.java`
-- `leitor-epub/src/components/bookProcessingDetails.test.ts`
+- DIRECT — `frontend/book-upload.test.mjs` valida estaticamente o seletor/upload em `frontend/src/App.tsx`; não é E2E.
+- DIRECT — `frontend/src/bookDetails.test.ts` exercita o resumo do job usado pelos detalhes/polling web; não é E2E.
+- DIRECT — `backend/src/test/java/br/com/leitormobile/lexicon/LexiconServiceTest.java` valida criação, reutilização e execução assíncrona do job no backend; não cobre o encadeamento web completo.
 
 Unknowns:
 - [TODO] Não foi encontrado E2E do encadeamento upload → job → polling → lookup em aplicação executando.
@@ -353,68 +352,62 @@ Evidence:
 - `leitor-epub/src/services/epubSecurity.test.ts`
 
 Tests:
-- `leitor-epub/src/services/epubImport.test.ts`
-- `leitor-epub/src/services/epubSecurity.test.ts`
-- `leitor-epub/src/db/migrations.test.ts`
+- DIRECT — `leitor-epub/src/services/epubImport.test.ts` valida a análise/validação do arquivo EPUB usada pela importação mobile.
+- DIRECT — `leitor-epub/src/services/epubSecurity.test.ts` valida as proteções de arquivo/conteúdo usadas pela importação mobile.
+- RELATED — `leitor-epub/src/db/migrations.test.ts` valida o esquema SQLite usado como pré-condição; não executa `importEpub` completo.
 
 Unknowns:
 - Nenhum.
 
-## FLOW-007 — Excluir livro e conteúdo armazenado
+## FLOW-007 — Excluir livro e conteúdo armazenado no web
 
 Status: VERIFIED
 
-Actor: usuário web ou mobile
+Actor: usuário web
 
-Surface: CROSS-SURFACE
+Surface: WEB
 
 Capabilities:
 - CAP-007
 
 APIs:
-- API-009 (web)
+- API-009
 
 Preconditions:
-- Livro existe; no web, sessão autenticada.
+- Livro existe e a sessão web está autenticada.
 
 Start:
 Usuário confirma excluir no menu/detalhes do livro.
 
 Steps:
 
-1. Web/API: chama `DELETE /api/books/{id}`.
+1. UI/API: usuário confirma a exclusão e frontend chama `DELETE /api/books/{id}`.
 2. Backend: service remove conteúdo/registro conforme implementação.
-3. Mobile: `deleteBookFiles`/`removeBook` removem arquivos locais e registro SQLite.
-4. UI: lista é atualizada e o livro deixa de aparecer na superfície da ação.
+3. UI: lista web é atualizada e o livro deixa de aparecer.
 
 Expected observable result:
-Livro e conteúdo associado deixam de estar disponíveis no caminho confirmado.
+Livro e conteúdo associado deixam de estar disponíveis na biblioteca web.
 
 Alternative paths:
-- Cancelamento não executa remoção; mobile pode remover apenas localmente, sem HTTP.
+- Cancelamento não executa remoção.
 
 Failure paths:
-- Livro inexistente, sessão inválida ou falha de filesystem/banco resulta em erro.
+- Livro inexistente, sessão inválida ou falha de filesystem/banco resulta em erro web.
 
 Persisted state:
-- Web: registro/conteúdo backend.
-- Mobile: registro SQLite e arquivos privados.
+- Registro e conteúdo no backend.
 
 Evidence:
 - `frontend/src/App.tsx`
 - `frontend/src/api.ts`
-- `leitor-epub/src/components/BookCard.tsx`
-- `leitor-epub/src/services/epubImport.ts`
-- `leitor-epub/src/db/repository.ts`
 - `backend/src/main/java/br/com/leitormobile/book/BookController.java`
 - `backend/src/main/java/br/com/leitormobile/book/BookService.java`
-- `backend/src/test/java/br/com/leitormobile/book/BookServiceTest.java`
 
 Tests:
-- `backend/src/test/java/br/com/leitormobile/book/BookServiceTest.java` cobre remoção/backend relacionada.
+- DIRECT — `backend/src/test/java/br/com/leitormobile/book/BookServiceTest.java` valida remoção do EPUB/capas no filesystem e do registro backend; não cobre a UI web completa.
 
 Unknowns:
-- [ASK USER] Não é demonstrável se exclusões mobile devem ser propagadas ao backend no sync.
+- Nenhum.
 
 ## FLOW-008 — Abrir e ler EPUB no web com persistência de posição
 
@@ -464,10 +457,9 @@ Evidence:
 - `frontend/src/api.ts`
 - `backend/src/main/java/br/com/leitormobile/book/BookController.java`
 - `backend/src/main/java/br/com/leitormobile/book/BookService.java`
-- `leitor-epub/src/reader/progress.test.ts`
 
 Tests:
-- `leitor-epub/src/reader/progress.test.ts` cobre conversões de progresso; não foi encontrado E2E do reader web.
+- NONE — Não foi encontrado teste automatizado aplicável ao reader web; `leitor-epub/src/reader/progress.test.ts` é mobile e não conta para esta journey.
 
 Unknowns:
 - Nenhum.
@@ -526,8 +518,8 @@ Evidence:
 - `leitor-epub/src/reader/readerBridge.test.ts`
 
 Tests:
-- `leitor-epub/src/reader/progress.test.ts`
-- `leitor-epub/src/reader/readerBridge.test.ts`
+- DIRECT — `leitor-epub/src/reader/progress.test.ts` exercita conversão/normalização de progresso usada pelo reader mobile; não é E2E.
+- DIRECT — `leitor-epub/src/reader/readerBridge.test.ts` valida eventos da ponte do reader mobile; não é E2E.
 
 Unknowns:
 - Nenhum.
@@ -587,9 +579,9 @@ Evidence:
 - `frontend/lexicon-lookup.test.mjs`
 
 Tests:
-- `frontend/card-creation.test.mjs`
-- `frontend/lexicon-lookup.test.mjs`
-- `frontend/lexicon-entry.test.mjs`
+- DIRECT — `frontend/card-creation.test.mjs` valida estaticamente lookup da seleção e payload de criação de card em `EpubReader`; não é E2E.
+- DIRECT — `frontend/lexicon-lookup.test.mjs` valida estaticamente a leitura do resultado lexical em `EpubReader`; não é E2E.
+- RELATED — `frontend/lexicon-entry-contract.test.mjs` valida estaticamente o contrato de campos exibido por `BookProcessingDetailsModal`; não executa a seleção/criação completa e não é E2E.
 
 Unknowns:
 - [TODO] Não foi encontrado E2E de seleção real no epub.js + lookup + criação backend.
@@ -643,7 +635,7 @@ Evidence:
 - `docs/system/API-CATALOG.md`
 
 Tests:
-- `leitor-epub/src/services/lookup.test.ts` cobre normalização/URLs; não integração Wiktionary.
+- DIRECT — `leitor-epub/src/services/lookup.test.ts` exercita normalização e URL do caminho de dicionário mobile; não testa a integração Wiktionary nem a jornada completa.
 
 Unknowns:
 - [TODO] Disponibilidade e resposta runtime da rede externa não são comprovadas pelos testes locais.
@@ -699,7 +691,7 @@ Evidence:
 - `leitor-epub/modules/expo-google-translate/android/src/main/java/expo/modules/googletranslate/ExpoGoogleTranslateModule.kt`
 
 Tests:
-- `leitor-epub/src/services/lookup.test.ts` cobre URL externa, não módulo/jornada de tradução.
+- DIRECT — `leitor-epub/src/services/lookup.test.ts` exercita a URL do caminho de tradução externa mobile; não testa ML Kit, dispositivo ou a jornada completa.
 
 Unknowns:
 - [TODO] Não foi executado dispositivo Android com módulo/modelo ML Kit para confirmar o caminho local.
@@ -753,7 +745,7 @@ Evidence:
 - `leitor-epub/src/services/lexicon.test.ts`
 
 Tests:
-- `leitor-epub/src/services/lexicon.test.ts` cobre derivação lexical, não interação completa mobile.
+- DIRECT — `leitor-epub/src/services/lexicon.test.ts` exercita derivação de campos e normalização da seleção usados na criação de card mobile; não é E2E.
 
 Unknowns:
 - [ASK USER] Não é demonstrado se card mobile deve ser equivalente ao card web antes do sync.
@@ -806,7 +798,7 @@ Evidence:
 - `leitor-epub/src/db/repository.test.ts`
 
 Tests:
-- `leitor-epub/src/db/repository.test.ts` cobre criação/atualização de anotações.
+- DIRECT — `leitor-epub/src/db/repository.test.ts` exercita criação/atualização de anotações no SQLite; não cobre a interação completa nem a exclusão.
 
 Unknowns:
 - [ASK USER] Não foi encontrada sincronização de anotações; não é demonstrável se a intenção é local-only ou se há lacuna.
@@ -857,7 +849,7 @@ Evidence:
 - `leitor-epub/src/db/repository.ts`
 
 Tests:
-- Não foi encontrado teste específico de bookmark.
+- NONE — Não foi encontrado teste automatizado aplicável a bookmark.
 
 Unknowns:
 - [ASK USER] Sync não inclui bookmarks no merge observado; não é demonstrável se devem permanecer locais.
@@ -915,7 +907,7 @@ Evidence:
 - `docs/codebase/CONCERNS.md`
 
 Tests:
-- Não foi encontrado teste específico da fila HTTP/UI.
+- NONE — Não foi encontrado teste automatizado aplicável à fila HTTP/UI web.
 
 Unknowns:
 - [TODO] Runtime ainda não confirmou o efeito prático da duplicação de `queueOrder`.
@@ -966,7 +958,7 @@ Evidence:
 - `leitor-epub/src/db/repository.ts`
 
 Tests:
-- Não foi encontrado teste específico das operações locais de cards.
+- NONE — Não foi encontrado teste automatizado aplicável às operações locais de cards.
 
 Unknowns:
 - [ASK USER] Equivalência de ordem/estado com a fila web depende da política de sync não definida.
@@ -1040,7 +1032,7 @@ Evidence:
 - `ACCOUNT-SYNC.md`
 
 Tests:
-- Não foi encontrado teste automatizado do serviço ou fluxo cross-surface completo.
+- NONE — Não foi encontrado teste automatizado aplicável ao serviço ou fluxo cross-surface completo.
 
 Unknowns:
 - [ASK USER] Fonte autoritativa geral e política de conflitos não são definidas.
@@ -1099,8 +1091,10 @@ Evidence:
 - `backend/src/main/java/br/com/leitormobile/lexicon/LexiconJobRunnerOptimized.java`
 
 Tests:
-- `backend/src/test/java/br/com/leitormobile/lexicon/LexiconServiceTest.java`
-- `leitor-epub/src/components/bookProcessingDetails.test.ts`
+- DIRECT — `frontend/lexicon-start.test.mjs` valida estaticamente o reprocessamento explícito web e a distinção da flag `force`; não é E2E.
+- DIRECT — `frontend/src/bookDetails.test.ts` exercita o resumo do job exibido nos detalhes/polling web; não é E2E.
+- DIRECT — `backend/src/test/java/br/com/leitormobile/lexicon/LexiconServiceTest.java` valida reutilização e reprocessamento forçado no serviço backend; não cobre a jornada completa.
+- DIRECT — `leitor-epub/src/components/bookProcessingDetails.test.ts` exercita o resumo do job exibido no detalhe mobile; não é E2E.
 
 Unknowns:
 - [TODO] Não foi encontrado E2E da ação + job assíncrono + consulta final.
@@ -1152,7 +1146,7 @@ Evidence:
 - `leitor-epub/src/db/repository.ts`
 
 Tests:
-- `leitor-epub/src/services/backupValidation.test.ts` cobre validação, não export/share completo.
+- NONE — Não foi encontrado teste automatizado aplicável à exportação/ZIP/compartilhamento.
 
 Unknowns:
 - [TODO] Retenção do ZIP após compartilhamento depende do sistema operacional e não é demonstrada.
@@ -1204,7 +1198,7 @@ Evidence:
 - `leitor-epub/src/services/backupValidation.test.ts`
 
 Tests:
-- `leitor-epub/src/services/backupValidation.test.ts`
+- DIRECT — `leitor-epub/src/services/backupValidation.test.ts` valida a barreira de segurança/referências usada antes de aplicar o restore; não cobre SQLite/filesystem completos nem é E2E.
 
 Unknowns:
 - [TODO] Não foi encontrado teste da restauração completa com SQLite/filesystem reais.
@@ -1252,10 +1246,9 @@ Evidence:
 - `leitor-epub/app/reader/[id].tsx`
 - `leitor-epub/src/components/reader/MoreActionsDialog.tsx`
 - `leitor-epub/src/services/lookup.ts`
-- `leitor-epub/src/services/epubSecurity.test.ts`
 
 Tests:
-- `leitor-epub/src/services/epubSecurity.test.ts` cobre distinção de links; não abertura OS completa.
+- NONE — Não foi encontrado teste automatizado aplicável a `handleExternalLink` ou à abertura de links pelo sistema operacional.
 
 Unknowns:
 - [TODO] Disponibilidade dos apps/browser no dispositivo não é verificável pelo código.
@@ -1307,8 +1300,8 @@ Evidence:
 - `backend/src/test/java/br/com/leitormobile/lexicon/LexiconJobRecoveryTest.java`
 
 Tests:
-- `backend/src/test/java/br/com/leitormobile/lexicon/LexiconJobRecoveryTest.java`.
-- Não foi encontrado teste específico do seeder.
+- DIRECT — `backend/src/test/java/br/com/leitormobile/lexicon/LexiconJobRecoveryTest.java` exercita a recuperação de jobs interrompidos.
+- Observação — Não foi encontrado teste específico do seeder; a cobertura existente é somente da recuperação lexical.
 
 Unknowns:
 - [ASK USER] A intenção de produto para a conta padrão não é demonstrada pelo código.
@@ -1361,7 +1354,7 @@ Evidence:
 - `docs/codebase/INTEGRATIONS.md`
 
 Tests:
-- Não foi encontrado teste automatizado específico do fluxo completo Kaikki.
+- NONE — Não foi encontrado teste automatizado aplicável ao importador Kaikki/Wiktionary.
 
 Unknowns:
 - [TODO] Dataset efetivo e resultado de uma execução real não são demonstrados pelo código isolado.
@@ -1418,9 +1411,9 @@ Evidence:
 - `backend/src/test/java/br/com/leitormobile/ai/ExternalAiContextPolicyTest.java`
 
 Tests:
-- `backend/src/test/java/br/com/leitormobile/ai/OllamaAiProviderTest.java`
-- `backend/src/test/java/br/com/leitormobile/ai/ExternalAiContextPolicyTest.java`
-- `backend/src/test/java/br/com/leitormobile/ai/ExternalAiExposurePolicyTest.java`
+- DIRECT — `backend/src/test/java/br/com/leitormobile/ai/OllamaAiProviderTest.java` valida o provider local `/api/chat`.
+- DIRECT — `backend/src/test/java/br/com/leitormobile/ai/ExternalAiContextPolicyTest.java` valida a política de contexto enviada ao provider.
+- DIRECT — `backend/src/test/java/br/com/leitormobile/ai/ExternalAiExposurePolicyTest.java` valida a política de exposição do contexto lexical.
 
 Unknowns:
 - [TODO] Ollama não foi executado nesta auditoria; disponibilidade/latência/resposta runtime permanecem não verificadas.
@@ -1471,10 +1464,61 @@ Evidence:
 - `docs/system/API-CATALOG.md`
 
 Tests:
-- Não foi encontrado teste específico dos endpoints Actuator.
+- NONE — Não foi encontrado teste automatizado aplicável aos endpoints Actuator.
 
 Unknowns:
 - [TODO] Payload/status efetivo depende da execução e dos indicadores do ambiente.
+
+## FLOW-027 — Excluir livro local e conteúdo armazenado no mobile
+
+Status: VERIFIED
+
+Actor: usuário mobile
+
+Surface: MOBILE
+
+Capabilities:
+- CAP-007
+
+APIs:
+- Nenhuma.
+
+Preconditions:
+- Livro existe no SQLite e seu EPUB/capa estão no filesystem privado.
+
+Start:
+Usuário confirma remover o livro no menu da biblioteca mobile.
+
+Steps:
+
+1. UI: a confirmação de remoção é apresentada no `BookCard`/biblioteca.
+2. Persistência: após confirmar, `removeBook` remove o registro local e retorna o livro removido.
+3. Filesystem: `deleteBookFiles` remove o EPUB e a capa locais associados.
+4. UI/estado: a biblioteca recarrega e o livro deixa de aparecer.
+
+Expected observable result:
+Livro e conteúdo associado deixam de estar disponíveis no aparelho mobile, sem chamada HTTP.
+
+Alternative paths:
+- Cancelamento não executa remoção; livro ausente não produz exclusão adicional.
+
+Failure paths:
+- Falha de SQLite ou filesystem impede/degrada a remoção conforme o tratamento da tela.
+
+Persisted state:
+- Registro no SQLite e EPUB/capa no filesystem privado são removidos.
+
+Evidence:
+- `leitor-epub/app/index.tsx`
+- `leitor-epub/src/components/BookCard.tsx`
+- `leitor-epub/src/services/epubImport.ts`
+- `leitor-epub/src/db/repository.ts`
+
+Tests:
+- NONE — Não foi encontrado teste automatizado aplicável à exclusão local completa.
+
+Unknowns:
+- Nenhum.
 
 ## Rastreabilidade FLOW → capability/API
 
@@ -1486,7 +1530,7 @@ Unknowns:
 | FLOW-004 | Consultar a biblioteca local mobile | MOBILE | CAP-004 | — |
 | FLOW-005 | Adicionar EPUB via web e preparar o léxico | WEB | CAP-003, CAP-005, CAP-016, CAP-019 | API-004, API-005, API-016, API-017, API-019 |
 | FLOW-006 | Importar EPUB local com validação mobile | MOBILE | CAP-004, CAP-006 | — |
-| FLOW-007 | Excluir livro e conteúdo armazenado | CROSS-SURFACE | CAP-007 | API-009 |
+| FLOW-007 | Excluir livro e conteúdo armazenado no web | WEB | CAP-007 | API-009 |
 | FLOW-008 | Abrir e ler EPUB no web com persistência de posição | WEB | CAP-008, CAP-010 | API-006, API-008 |
 | FLOW-009 | Ler EPUB local, navegar e configurar o reader mobile | MOBILE | CAP-009, CAP-010, CAP-011, CAP-012 | — |
 | FLOW-010 | Selecionar texto no web, consultar léxico e criar card | WEB | CAP-014, CAP-016, CAP-017 | API-011, API-016, API-019 |
@@ -1506,6 +1550,7 @@ Unknowns:
 | FLOW-024 | Importar catálogo lexical Kaikki/Wiktionary | BACKEND/OPERATOR | CAP-021 | — |
 | FLOW-025 | Enriquecer candidatos lexicais com Ollama local | BACKEND/OPERATOR | CAP-019, CAP-020 | API-016, API-017 |
 | FLOW-026 | Verificar health operacional do backend | BACKEND/OPERATOR | CAP-025 | API-020, API-021 |
+| FLOW-027 | Excluir livro local e conteúdo armazenado no mobile | MOBILE | CAP-007 | — |
 
 ## Rastreabilidade capability → FLOWs
 
@@ -1517,7 +1562,7 @@ Unknowns:
 | CAP-004 | FLOW-004, FLOW-006, FLOW-018 |
 | CAP-005 | FLOW-005 |
 | CAP-006 | FLOW-006 |
-| CAP-007 | FLOW-007 |
+| CAP-007 | FLOW-007, FLOW-027 |
 | CAP-008 | FLOW-008 |
 | CAP-009 | FLOW-009, FLOW-015 |
 | CAP-010 | FLOW-008, FLOW-009, FLOW-018 |
@@ -1543,16 +1588,16 @@ Nenhuma das 25 capabilities ficou sem análise. CAP-002, CAP-020, CAP-021 e CAP-
 
 ### Totais
 
-- Total de journeys: **26**.
-- VERIFIED: **19** — FLOW-001, FLOW-003, FLOW-004, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-011, FLOW-013, FLOW-014, FLOW-015, FLOW-017, FLOW-019, FLOW-020, FLOW-021, FLOW-022, FLOW-023, FLOW-024, FLOW-026.
+- Total de journeys: **27**.
+- VERIFIED: **20** — FLOW-001, FLOW-003, FLOW-004, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-011, FLOW-013, FLOW-014, FLOW-015, FLOW-017, FLOW-019, FLOW-020, FLOW-021, FLOW-022, FLOW-023, FLOW-024, FLOW-026, FLOW-027.
 - PARTIALLY_VERIFIED: **5** — FLOW-005, FLOW-010, FLOW-012, FLOW-016, FLOW-025.
 - UNKNOWN_INTENT: **2** — FLOW-002, FLOW-018.
 
 ### Classificação por superfície
 
-- WEB: **6** — FLOW-001, FLOW-003, FLOW-005, FLOW-008, FLOW-010, FLOW-016.
-- MOBILE: **12** — FLOW-004, FLOW-006, FLOW-009, FLOW-011, FLOW-012, FLOW-013, FLOW-014, FLOW-015, FLOW-017, FLOW-020, FLOW-021, FLOW-022.
-- CROSS-SURFACE: **4** — FLOW-002, FLOW-007, FLOW-018, FLOW-019.
+- WEB: **7** — FLOW-001, FLOW-003, FLOW-005, FLOW-007, FLOW-008, FLOW-010, FLOW-016.
+- MOBILE: **13** — FLOW-004, FLOW-006, FLOW-009, FLOW-011, FLOW-012, FLOW-013, FLOW-014, FLOW-015, FLOW-017, FLOW-020, FLOW-021, FLOW-022, FLOW-027.
+- CROSS-SURFACE: **3** — FLOW-002, FLOW-018, FLOW-019.
 - BACKEND/OPERATOR: **4** — FLOW-023, FLOW-024, FLOW-025, FLOW-026.
 
 ### Cobertura de capabilities e APIs
@@ -1561,11 +1606,16 @@ Nenhuma das 25 capabilities ficou sem análise. CAP-002, CAP-020, CAP-021 e CAP-
 - APIs sem journey: **nenhuma**; API-001 a API-021 aparecem nas jornadas individuais/matriz.
 - OUT-001: coberto por FLOW-011, com CAP-016 como capability funcional principal e CAP-014 como contexto de seleção.
 
-### Jornadas sem teste automatizado relacionado conhecido
+### Classificação das journeys por teste automatizado
+
+- Com algum teste DIRECT: **13** — FLOW-005, FLOW-006, FLOW-007, FLOW-009, FLOW-010, FLOW-011, FLOW-012, FLOW-013, FLOW-014, FLOW-019, FLOW-021, FLOW-023 e FLOW-025.
+- Apenas teste RELATED: **2** — FLOW-001 e FLOW-004.
+- Sem teste automatizado aplicável: **12** — FLOW-002, FLOW-003, FLOW-008, FLOW-015, FLOW-016, FLOW-017, FLOW-018, FLOW-020, FLOW-022, FLOW-024, FLOW-026 e FLOW-027.
+- E2E reais encontrados: **0** — os testes encontrados são unitários, de componentes/serviços ou contratos estáticos; nenhum executa a jornada completa em aplicação/dispositivo.
 
 Considerando “teste conhecido” como teste automatizado relacionado ao fluxo, não como prova de E2E completo:
 
-- FLOW-002, FLOW-004, FLOW-012, FLOW-013, FLOW-015, FLOW-016, FLOW-017, FLOW-018, FLOW-020, FLOW-022, FLOW-024 e FLOW-026.
+- FLOW-002, FLOW-003, FLOW-008, FLOW-015, FLOW-016, FLOW-017, FLOW-018, FLOW-020, FLOW-022, FLOW-024, FLOW-026 e FLOW-027.
 
 Total: **12 journeys** sem teste automatizado relacionado conhecido.
 
@@ -1592,9 +1642,9 @@ Total: **12 journeys** sem teste automatizado relacionado conhecido.
 
 A segunda passagem considerou as superfícies de rota encontradas na baseline:
 
-- Web: não foi encontrada uma tabela de rotas separada; `frontend/src/App.tsx` alterna as superfícies de login, biblioteca, reader, processamento e cards. Essas entradas aparecem em FLOW-001, FLOW-003, FLOW-005, FLOW-008, FLOW-010 e FLOW-016.
+- Web: não foi encontrada uma tabela de rotas separada; `frontend/src/App.tsx` alterna as superfícies de login, biblioteca, reader, processamento e cards. Essas entradas aparecem em FLOW-001, FLOW-003, FLOW-005, FLOW-007, FLOW-008, FLOW-010 e FLOW-016.
 - Mobile `/login`: FLOW-002.
-- Mobile `/`: FLOW-002 e FLOW-004.
+- Mobile `/`: FLOW-002, FLOW-004 e FLOW-027.
 - Mobile `/cards`: FLOW-013 e FLOW-017.
 - Mobile `/reader/[id]`: FLOW-009, FLOW-011, FLOW-012, FLOW-013, FLOW-014, FLOW-015 e FLOW-022.
 - Mobile `/backup`: FLOW-020 e FLOW-021.
