@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -230,15 +231,17 @@ class BookControllerApiTest extends PostgresIntegrationTestSupport {
         assertEquals(ownerABookCount, bookRepository.findLibrary(ownerA.getId()).size());
 
         MvcResult crossOwner = performCreate(tokenB, createRequestWithHash("cross-owner.epub", hash)).andReturn();
-        int status = crossOwner.getResponse().getStatus();
-        assertTrue(status == 201 || status == 409, "Unexpected cross-owner fileHash status: " + status);
-        if (status == 201) {
-            UUID crossOwnerId = UUID.fromString(objectMapper.readTree(crossOwner.getResponse().getContentAsString()).get("id").asText());
-            fixtureBookIds.add(crossOwnerId);
-            assertEquals(ownerB.getId(), bookRepository.findById(crossOwnerId).orElseThrow().getOwner().getId());
-        } else {
-            assertEquals(0, bookRepository.findLibrary(ownerB.getId()).size());
-        }
+        assertEquals(201, crossOwner.getResponse().getStatus());
+        UUID crossOwnerId = UUID.fromString(objectMapper.readTree(crossOwner.getResponse().getContentAsString()).get("id").asText());
+        fixtureBookIds.add(crossOwnerId);
+
+        Book ownerABook = bookRepository.findById(firstId).orElseThrow();
+        Book ownerBBook = bookRepository.findById(crossOwnerId).orElseThrow();
+        assertNotEquals(firstId, crossOwnerId);
+        assertEquals(ownerA.getId(), ownerABook.getOwner().getId());
+        assertEquals(ownerB.getId(), ownerBBook.getOwner().getId());
+        assertEquals(hash, ownerABook.getFileHash());
+        assertEquals(hash, ownerBBook.getFileHash());
     }
 
     @Test
