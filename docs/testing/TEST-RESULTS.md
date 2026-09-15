@@ -242,3 +242,35 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Mobile lint: `PASS` — `cd leitor-epub; npm run lint`; exit code 0; 0 errors, 0 warnings. O artefato gerado `.expo/types/router.d.ts` não foi editado; `.expo/**` foi apenas incluído no ignore do ESLint.
 - Filesystem: `BookServiceTest` mantém `@TempDir`; nenhum teste fonte referencia `data/library`; `backend/data/library` não foi usado nem alterado.
 - Escopo: nenhuma migration foi alterada; o Flyway apenas validou o schema isolado de `leitor_test`. Produção, segredo, Playwright, E2E e TEST planejado não foram alterados/executados. TEST-012 e TEST-026 permanecem `PASS`; todos os demais TEST IDs permanecem `NOT_RUN`.
+
+## Wave 1A — Authentication contracts
+
+- Base utilizada: `origin/main` / `4e19f12a9f1977357c85a4deb11aedd228d8955f`.
+- Branch: `test/wave-1a-authentication-contracts`.
+- Data/hora UTC: 2026-09-15T13:09:37Z.
+- Database/schema/usuário: `leitor_test` / `public` / `leitor_test_user`; a identidade foi confirmada por `SELECT current_database(), current_schema(), current_user` antes das execuções.
+- Profile: `test`, ativado por `PostgresIntegrationTestSupport`; Flyway validou o schema isolado sem alterar migrations.
+
+### TEST-002
+
+- Status: `PASS`.
+- Cenários: `AuthControllerTest` executou 2 testes: e-mail conhecido com senha incorreta e e-mail inexistente.
+- Comando unitário: `cd backend; mvn -q -Dtest=AuthControllerTest test`; exit code `0`; total `2`, pass `2`, failures `0`, errors `0`, skipped `0`.
+- Evidência: ambos os requests receberam `401 Unauthorized`; a contagem de `session_tokens` permaneceu inalterada em cada cenário, comprovando que nenhuma sessão autenticada foi persistida.
+- Regressão completa: `cd backend; mvn -q test`; exit code `0`; total `25`, pass `25`, failures `0`, errors `0`, skipped `0`; 16 relatórios Surefire.
+- Observações: o e-mail conhecido foi verificado no banco de teste antes do caso de senha incorreta. Uma tentativa inicial sem `TEST_DATABASE_PASSWORD` falhou antes do carregamento do contexto (`SQLState 28P01`, classificação `ENVIRONMENT`); a execução válida usou a credencial apenas como variável de processo, sem registrá-la.
+
+### TEST-003
+
+- Status: `PASS`.
+- Cenários: `SecurityConfigTest` preservou o caso existente e executou 4 testes: Bearer ausente, Bearer malformado, token inexistente e token expirado.
+- Comando unitário: `cd backend; mvn -q -Dtest=SecurityConfigTest test`; exit code `0`; total `4`, pass `4`, failures `0`, errors `0`, skipped `0`.
+- Evidência: os quatro requests a `GET /api/books` receberam `401 Unauthorized`; o token expirado foi persistido com expiração determinística em `Instant.EPOCH` e removido no cleanup do teste, sem sleep ou timeout.
+- Regressão completa: `cd backend; mvn -q test`; exit code `0`; total `25`, pass `25`, failures `0`, errors `0`, skipped `0`.
+- Observações: a execução combinada `mvn -q "-Dtest=AuthControllerTest,SecurityConfigTest" test` também passou com `6/6` testes. Nenhuma configuração de segurança de produção foi flexibilizada.
+
+### Escopo dos TEST IDs
+
+- `TEST-002` e `TEST-003` foram promovidos de `NOT_RUN` para `PASS` porque todos os cenários descritos na matriz foram implementados e executados com evidência fresca.
+- `TEST-012` e `TEST-026` permanecem `PASS` desde a Wave 0.
+- Todos os demais TEST IDs permanecem `NOT_RUN`; nenhuma outra wave foi iniciada.
