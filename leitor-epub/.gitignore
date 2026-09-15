@@ -2,6 +2,7 @@ node_modules/
 .codex-remote-attachments/
 .pnpm-store/
 **/build/
+**/.gradle/
 .expo/
 dist/
 web-build/
