@@ -274,3 +274,62 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `TEST-002` e `TEST-003` foram promovidos de `NOT_RUN` para `PASS` porque todos os cenários descritos na matriz foram implementados e executados com evidência fresca.
 - `TEST-012` e `TEST-026` permanecem `PASS` desde a Wave 0.
 - Todos os demais TEST IDs permanecem `NOT_RUN`; nenhuma outra wave foi iniciada.
+
+## Wave 1B — Book contracts
+
+- Base utilizada: `origin/main` / `7f8881903ddabb5d79aeffe96221e7f0702b9a4a`.
+- Branch/worktree: `test/wave-1b-book-contracts` / worktree isolado `D:\LeitorMobile-worktrees\wave-1b-book-contracts`.
+- Data/hora UTC do registro: `2026-09-15T14:32:34Z`.
+- Profile: `test`, ativado por `PostgresIntegrationTestSupport`; nenhuma configuração de produção ou migration foi alterada.
+- Database/schema/usuário confirmados pelos testes: `leitor_test` / `public` / `leitor_test_user`; os logs do Flyway e a guarda de identidade confirmaram `current_database() != leitor`.
+- Storage: diretório temporário exclusivo da classe criado por `Files.createTempDirectory("leitor-wave-1b-book-api-")` e injetado via `@DynamicPropertySource`; `backend/data/library` não foi usado.
+- Fixture: owners e sessões sintéticos por teste; tokens brutos ficam apenas em memória/processo de teste e somente seus hashes são persistidos, sem segredo real; cleanup remove somente IDs e paths criados pela fixture.
+
+### TEST-010
+
+- Status: `PASS`.
+- Cenários: listagem vazia/sem parâmetro, busca por título, busca por autor e busca sem resultado; dois owners com livros distintos; capa própria existente, sem capa, inexistente e de outro owner; ausência de Bearer.
+- Teste: `listSearchAndCoverAccessRemainScopedToCurrentOwner`.
+- Testes específicos: `listSearchAndCoverAccessRemainScopedToCurrentOwner` (1 teste). Comando: `cd backend; mvn -q -Dtest=BookControllerApiTest test`; harness com `tests=13`, `failures=0`, `errors=0`, `skipped=0`, exit code `0`.
+- Evidência/efeitos: a listagem de OWNER_A contém somente seus IDs e a de OWNER_B somente o próprio; título/autor filtram sem vazamento; acesso à capa própria entrega os bytes esperados, enquanto capa sem arquivo, inexistente, de outro owner e sem sessão não entregam conteúdo de outro owner.
+
+### TEST-014
+
+- Status: `PASS`.
+- Cenários: criação válida, owner derivado da sessão, `originalName` obrigatório/blank, trim de `fileHash`, `manual:<UUID>` para hash blank, defaults e normalizações, duplicidade no mesmo owner, comportamento observado de mesma hash entre owners e criação sem autenticação.
+- Testes: `createBookAppliesApi004DefaultsAndBindsTheCurrentOwner`, `createBookTrimsExplicitHashRejectsDuplicatesAndObservesCrossOwnerConstraint`, `createBookRequiresOriginalNameAndAuthenticatedOwner`.
+- Testes específicos: 3 testes (`createBookAppliesApi004DefaultsAndBindsTheCurrentOwner`, `createBookTrimsExplicitHashRejectsDuplicatesAndObservesCrossOwnerConstraint`, `createBookRequiresOriginalNameAndAuthenticatedOwner`). Comando: `cd backend; mvn -q -Dtest=BookControllerApiTest test`; harness com `tests=13`, `failures=0`, `errors=0`, `skipped=0`, exit code `0`.
+- Evidência/efeitos: registro criado pertence ao owner da sessão; request não usa campo `owner`; EPUB/SHA não foram incluídos. A mesma hash entre owners foi observada como `409` nesta configuração de schema, sem assumir regra diferente.
+- Observação de investigação: o fallback de título usa o `originalName` antes do trim/remoção de extensão; a assertion foi alinhada ao valor efetivamente observado, sem alteração de produção.
+
+### TEST-015
+
+- Status: `PASS`.
+- Cenários: upload EPUB/capa com SHA-256 correspondente, hash divergente, ausência de partes, owner diferente, ID inexistente, tamanho declarado acima de 100 MB e `originalFilename` com traversal.
+- Testes: `uploadStoresMatchingEpubAndCoverInsideTheDedicatedStorageRoot`, `uploadRejectsInvalidContentAndOwnershipWithoutCreatingManagedFiles`, `uploadRejectsDeclaredEpubSizeAbove100MbWithoutAllocatingAGiantFixture`, `uploadOriginalFilenameCannotEscapeTheManagedStorageRoot`.
+- Testes específicos: 4 testes (`uploadStoresMatchingEpubAndCoverInsideTheDedicatedStorageRoot`, `uploadRejectsInvalidContentAndOwnershipWithoutCreatingManagedFiles`, `uploadRejectsDeclaredEpubSizeAbove100MbWithoutAllocatingAGiantFixture`, `uploadOriginalFilenameCannotEscapeTheManagedStorageRoot`). Comando: `cd backend; mvn -q -Dtest=BookControllerApiTest test`; harness com `tests=13`, `failures=0`, `errors=0`, `skipped=0`, exit code `0`.
+- Evidência/efeitos: bytes e paths válidos foram confirmados sob o storage temporário; mismatch, ausência, owner incorreto, ID ausente e limite foram rejeitados sem `fileUri`/arquivo EPUB indevido. O caso de filename malicioso confirmou que o target é construído por ID sob `storageRoot`; nenhum arquivo escapou. O limite usou `MultipartFile` de fixture pequena com tamanho declarado acima do limite, sem alocar 100 MB.
+
+### TEST-021
+
+- Status: `PASS`.
+- Cenários: delete próprio com EPUB/capa/stale cover, livro inexistente, owner incorreto, sessão ausente/inválida, path externo; preservação do registro, arquivo de outro owner e arquivo externo nos negativos.
+- Testes API: `deleteRemovesOnlyTheAuthorizedBookAndItsManagedContent`, `deleteRejectsMissingOtherOwnerAndUnauthenticatedRequestsWithoutDeletingFiles`, `deleteRejectsStoredPathOutsideRootWithoutDeletingDatabaseOrExternalFile`.
+- Harness service existente: `BookServiceTest` permaneceu intacto e continuou cobrindo remoção via storage temporário e path externo sem apagar a linha do banco.
+- Comando: `cd backend; mvn -q "-Dtest=BookServiceTest,BookControllerApiTest" test`; `BookControllerApiTest=13`, `BookServiceTest=2`, total `15`, failures `0`, errors `0`, skipped `0`, exit code `0`.
+- Evidência/efeitos: somente o recurso autorizado foi removido; nos negativos, o banco e os arquivos protegidos permaneceram intactos. Nenhum arquivo foi escrito/removido em `backend/data/library`.
+
+### TEST-024
+
+- Status: `PASS`.
+- Cenários: download próprio com arquivo, sem arquivo, inexistente, outro owner, path fora do root e sessão ausente; progresso válido, abaixo/acima do domínio, `null`, CFI válido, vazio e null; owner incorreto e sessão inválida.
+- Testes: `downloadIsOwnerScopedAndRequiresAnAccessibleManagedFile`, `progressPersistsValidValuesAndRejectsInvalidValuesWithoutChangingState`.
+- Testes específicos: 2 testes (`downloadIsOwnerScopedAndRequiresAnAccessibleManagedFile`, `progressPersistsValidValuesAndRejectsInvalidValuesWithoutChangingState`). Comando: `cd backend; mvn -q -Dtest=BookControllerApiTest test`; harness com `tests=13`, `failures=0`, `errors=0`, `skipped=0`, exit code `0`.
+- Evidência/efeitos: somente o arquivo gerenciado e autorizado foi entregue; path externo não foi exposto. Valores de progresso inválidos não persistiram e não alteraram CFI/progresso; `progress=null`, CFI vazio e CFI null seguiram o comportamento documentado/observado.
+
+### Regressão e verificação final da Wave 1B
+
+- Verificação combinada: `cd backend; mvn -q "-Dtest=BookControllerApiTest,BookServiceTest" test`; total `15`, pass `15`, failures `0`, errors `0`, skipped `0`, exit code `0`.
+- Regressão completa: `cd backend; mvn -q test`; total `38`, pass `38`, failures `0`, errors `0`, skipped `0`, exit code `0`; `17` relatórios Surefire.
+- TEST IDs preservados: `TEST-002=PASS`, `TEST-003=PASS`, `TEST-012=PASS`, `TEST-026=PASS`; nenhum outro TEST ID foi promovido ou alterado.
+- Arquivos de produção, migrations, `application-test.yml`, `PostgresIntegrationTestSupport`, `backend/data/library` e testes existentes não relacionados não foram alterados.
