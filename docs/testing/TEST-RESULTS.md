@@ -302,6 +302,13 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Evidência/efeitos: registro criado pertence ao owner da sessão; request não usa campo `owner`; EPUB/SHA não foram incluídos. A mesma hash entre owners foi observada como `409` nesta configuração de schema, sem assumir regra diferente.
 - Observação de investigação: o fallback de título usa o `originalName` antes do trim/remoção de extensão; a assertion foi alinhada ao valor efetivamente observado, sem alteração de produção.
 
+### Wave 1B — TEST-014 contract hardening
+
+- A tentativa inicial de hardening para `409` revelou `TEST_EXPECTATION_ERROR`.
+- A V2 remove a `UNIQUE` global de `file_hash` e cria `uq_books_user_file_hash(user_id, file_hash)`.
+- Comportamento confirmado: mesma hash entre owners diferentes resulta em `201`; duplicidade continua proibida dentro do mesmo owner.
+- Nenhuma produção ou migration foi alterada. TEST-014 permanece `PASS`.
+
 ### TEST-015
 
 - Status: `PASS`.
