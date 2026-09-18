@@ -428,3 +428,24 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - O primeiro erro do teste adicional foi classificado como `TEST_INFRASTRUCTURE`: o serviço usa o bridge package-local `br.com.leitormobile.lexicon.OllamaAiProvider`; o harness foi corrigido para esse tipo sem alteração de produção ou de expectations.
 - `updatedAt` não é objeto desta wave; não foi criada assertion de timestamp exato.
 - TEST IDs alterados: somente `TEST-058` e `TEST-059`; `TEST-060`, `TEST-041` e `TEST-042` permanecem fora do escopo; nenhuma Wave 2 foi iniciada.
+
+## Wave 1D-C — Actuator contract
+
+- Status: `PASS`.
+- Base utilizada: `origin/main` / `01880c29e4575f74282de9df80ca4c1b19c2f7c5`.
+- Branch/worktree: `test/wave-1d-c-actuator-contract` / `D:\LeitorMobile-worktrees\wave-1d-c-actuator-contract`.
+- Data/hora UTC do registro: `2026-09-18T15:38:52Z`.
+- Database/schema/usuário: `leitor_test` / `public` / `leitor_test_user`; identidade confirmada após a regressão por `SELECT current_database(), current_schema(), current_user`.
+- Profile: `test`, ativado por `PostgresIntegrationTestSupport`; nenhuma migration, `SecurityConfig` ou `application.yml` foi alterada.
+
+### TEST-060
+
+- Status: `PASS`.
+- Teste: `backend/src/test/java/br/com/leitormobile/health/ActuatorContractTest.java`, 5 métodos; comando direcionado `cd backend; mvn -q -Dtest=ActuatorContractTest test`; exit code `0`; total `5`, pass `5`, failures `0`, errors `0`, skipped `0`.
+- Health: request anônimo a `GET /actuator/health` recebeu `200` e payload observado `{"status":"UP"}` quando o datasource de `leitor_test` estava disponível.
+- Info: request anônimo a `GET /actuator/info` recebeu `401`; com Bearer sintético válido recebeu `200` e body `{}`; Bearer inválido recebeu `401`. O corpo vazio foi observado porque não há `InfoContributor` customizado exposto na baseline.
+- Degradação: exercitada de forma determinística por `HealthIndicator` definido apenas em `@TestConfiguration`, sem substituir o datasource e sem interromper PostgreSQL; o Actuator produziu `503` e `{"status":"DOWN"}`.
+- Endpoint não exposto: `GET /actuator/env` com sessão sintética válida recebeu `404`; a exposição permaneceu limitada a `health,info`.
+- Fixtures/sessão: usuário e token Bearer sintéticos por teste; somente o hash do token foi persistido; cleanup removeu exclusivamente a sessão e o usuário criados pela classe.
+- Regressão completa: `cd backend; mvn -q test`; exit code `0`; total `61`, pass `61`, failures `0`, errors `0`, skipped `0`; `21` relatórios Surefire em `backend/target/surefire-reports`.
+- TEST IDs alterados: somente `TEST-060` foi promovido para `PASS`; `TEST-041` e `TEST-042` permanecem `NOT_RUN` e nenhuma Wave 2 foi iniciada.
