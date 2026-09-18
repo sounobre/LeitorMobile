@@ -496,3 +496,47 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `CardControllerTest` após os probes: PASS; `mvn -q -Dtest=CardControllerTest test`; exit code `0`; total `5`, pass `5`, failures `0`, errors `0`, skipped `0`.
 - Não foi executado `mvn -q test` após os probes, porque ambos falham intencionalmente para preservar a evidência do defeito confirmado; a baseline limpa de `61/61` está registrada acima.
 - TEST IDs alterados: somente `TEST-041` e `TEST-042`; ambos permanecem probes `DEFECT_PROBE`, não acceptance. Nenhuma Wave posterior foi iniciada.
+
+## QueueOrder confirmed bug — TDD fix
+
+- Status: `PASS` após a correção; o histórico RED/CONFIRMED da Wave 2 foi preservado acima.
+- Base utilizada: `origin/main` / `e8a3cf309bdfc46eee1b70148af75e1aeb64bac1`.
+- Branch/worktree: `fix/queue-order` / `D:\LeitorMobile-worktrees\fix-queue-order`.
+- Data/hora UTC do registro: `2026-09-18T17:57:56Z`.
+- Database/schema/usuário: `leitor_test` / `public` / `leitor_test_user`; confirmados após a regressão com `SELECT current_database(), current_schema(), current_user`.
+
+### Root cause
+
+- `CardRepository.findNextQueueOrder(ownerId)` retornava `coalesce(max(c.queueOrder), -1)`, embora `CardService.create` e `CardService.moveToEnd` usassem o retorno diretamente como o novo valor de `queueOrder`.
+- Com owner sem cards ativos, o retorno era `-1` em todas as criações; com `A=10, B=20, C=30`, move-to-end de A recebia `30`, empatando com C.
+- O primeiro ponto de divergência foi o boundary da query do repository para os call sites do service/construtor ou `Card.moveToEnd`; as queries de ownership e ordenação não foram alteradas.
+
+### Production change
+
+- Arquivo: `backend/src/main/java/br/com/leitormobile/card/CardRepository.java`.
+- Antes: `coalesce(max(c.queueOrder), -1)`.
+- Depois: `coalesce(max(c.queueOrder), -1) + 1`.
+- Rationale: centraliza a semântica de “next queue order” no helper já compartilhado, produzindo valor estritamente maior que o máximo ativo; owner sem cards começa em `0`. O filtro `archived = false`, ownership, schema, migrations, queries de listagem e ordenação secundária por `createdAt` foram preservados.
+- Nenhum teste adicional de repository foi criado: os probes cobrem diretamente os dois call sites reais e verificam a evidência persistida/ordenada sem duplicar cobertura.
+
+### RED confirmado antes do patch
+
+- `TEST-041 = FAIL / CONFIRMED`: criações sequenciais produziram `queueOrder=[-1,-1,-1]`; `findNextQueueOrder` antes/depois permaneceu `[-1,-1,-1]`.
+- `TEST-042 = FAIL / CONFIRMED`: fixture inicial `A=10, B=20, C=30`; após move-to-end(A), `A=30, B=20, C=30` e ordem `[B,A,C]`.
+- Comando de revalidação: `cd backend; mvn -q "-Dtest=CardQueueOrderProbeTest,CardMoveToEndProbeTest" test`; total `2`, pass `0`, failures `2`, errors `0`, skipped `0`, exit code `1`.
+
+### GREEN após o patch
+
+- `TEST-041 = PASS`: `queueOrders=[0,1,2]`, com progressão estritamente crescente e ordem persistida correspondente.
+- `TEST-042 = PASS`: fixture inicial `A=10, B=20, C=30`; após move-to-end(A), `A=31, B=20, C=30`; A terminou estritamente após B e C em `findActive(ownerId)`.
+- Comandos: `cd backend; mvn -q -Dtest=CardQueueOrderProbeTest test`; `cd backend; mvn -q -Dtest=CardMoveToEndProbeTest test`; execução combinada `cd backend; mvn -q "-Dtest=CardQueueOrderProbeTest,CardMoveToEndProbeTest" test`; todos com exit code `0`, total combinado `2`, pass `2`, failures `0`, errors `0`, skipped `0`.
+- Contrato relacionado: `CardControllerTest` total `5`, pass `5`, failures `0`, errors `0`, skipped `0`, exit code `0`.
+
+### Regression and final state
+
+- Regressão: `cd backend; mvn -q test`; total `63`, pass `63`, failures `0`, errors `0`, skipped `0`, exit code `0`; `23` relatórios Surefire em `backend/target/surefire-reports`.
+- Verificação de identidade: `current_database()=leitor_test`, `current_schema()=public`, `current_user=leitor_test_user`.
+- `TEST-041`: status final após fix `PASS`; verdict histórico `CONFIRMED`; bug state `FIXED`.
+- `TEST-042`: status final após fix `PASS`; verdict histórico `CONFIRMED`; bug state `FIXED`.
+- `BUG_CANDIDATE QUEUE_ORDER: CONFIRMED → FIXED`.
+- Nenhuma migration, schema, `CardService`, `Card`, `CardController`, query de listagem ou fixture de probe foi alterada; nenhum push, merge ou Wave 3 foi iniciado.
