@@ -11,6 +11,7 @@ export type ApiSession = {
 export type ApiBook = {
   id: string;
   fileHash: string;
+  originalName: string;
   title: string;
   author: string;
 };
@@ -21,6 +22,35 @@ export type CreateBookInput = {
   title: string;
   author: string;
   language: string;
+};
+
+export type ApiLexiconJob = {
+  id: string;
+  bookId: string;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  progress: number;
+  processedUnits: number;
+  totalUnits: number;
+  processedTokens: number;
+  totalLexemes: number;
+  phase: string;
+  message: string | null;
+  errorMessage: string | null;
+};
+
+export type ApiLexiconEntry = {
+  lemma: string;
+  partOfSpeech: string | null;
+  wordForms: string[];
+  definition: string;
+  translationPtBr: string;
+  ipa: string;
+  cefr: string;
+  bookFrequency: number;
+  firstSentenceId: string | null;
+  resolutionStatus: string;
+  pedagogicalRelevance: string | null;
+  senses: Array<{ id: string; senseKey: string; definition: string; translationPtBr: string }>;
 };
 
 export function createApiClient(request: APIRequestContext) {
@@ -50,6 +80,19 @@ export function createApiClient(request: APIRequestContext) {
       }));
     },
 
+    async getLexiconJob(token: string, bookId: string): Promise<ApiLexiconJob | null> {
+      return readJson<ApiLexiconJob | null>(await request.get(`${apiUrl}/books/${bookId}/lexicon/jobs/latest`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }));
+    },
+
+    async lookupBookLexicon(token: string, bookId: string, term: string): Promise<{ status: number; body: ApiLexiconEntry | null }> {
+      const response = await request.get(`${apiUrl}/books/${bookId}/lexicon/lookup?term=${encodeURIComponent(term)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return { status: response.status(), body: await readJson<ApiLexiconEntry | null>(response) };
+    },
+
     async deleteBook(token: string, id: string): Promise<void> {
       const response = await request.delete(`${apiUrl}/books/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -59,9 +102,11 @@ export function createApiClient(request: APIRequestContext) {
 
     async deleteBooksWithPrefix(token: string, prefix: string): Promise<void> {
       const books = await this.listBooks(token);
-      for (const book of books.filter((item) => item.fileHash.startsWith(prefix))) {
+      for (const book of books.filter((item) => (item.fileHash.startsWith(prefix) || item.originalName.startsWith(prefix)))) {
         await this.deleteBook(token, book.id);
       }
+      const remaining = (await this.listBooks(token)).filter((item) => (item.fileHash.startsWith(prefix) || item.originalName.startsWith(prefix)));
+      if (remaining.length > 0) throw new Error(`Book cleanup left ${remaining.length} fixture book(s)`);
     },
   };
 }

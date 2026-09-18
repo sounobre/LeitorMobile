@@ -566,3 +566,23 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Frontend baseline antes e após o E2E: `npm run build` exit code `0` em ambas as execuções; static tests `node --test book-upload.test.mjs card-creation.test.mjs lexicon-entry-contract.test.mjs lexicon-lookup.test.mjs lexicon-start.test.mjs`, total `5`, pass `5`, failures `0`, skipped `0`, exit code `0` antes e após o E2E.
 - Divergências investigadas: a primeira execução omitiu `--config` e falhou com `ECONNREFUSED` porque os webServers não foram carregados; o config ESM foi ajustado para `import.meta.url`; a mensagem textual esperada para login inválido foi removida após observar que o frontend expõe o fallback HTTP `401`. Classificações: `TEST_INFRASTRUCTURE` nas duas primeiras ocorrências de harness/config e `TEST_EXPECTATION_ERROR` na mensagem; nenhuma alteração de produção.
 - TEST IDs alterados: somente `TEST-001`; `TEST-009`, `TEST-013`, `TEST-020`, `TEST-023`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados.
+
+## Wave 3B — Web EPUB upload and lexical processing
+
+### TEST-013
+
+- Status: `PASS`.
+- Base utilizada: `origin/main` / `253bb97f6fe4c5f5978688bad0dde4129337a5e7`.
+- Branch/worktree: `test/wave-3b-web-e2e-upload` / `D:\LeitorMobile-worktrees\wave-3b-web-e2e-upload`.
+- Data/hora UTC do registro: `2026-09-18T19:52:10Z`.
+- Playwright/browser: `@playwright/test` `1.62.1`; Chromium local Playwright, Chromium runtime `v1234`; nenhum Firefox/WebKit ou Ollama real foi usado.
+- Ambiente: backend `http://127.0.0.1:8080`, frontend `http://127.0.0.1:5173`, `leitor_test` / `public` / `leitor_test_user`; `APP_AI_ENABLED=false`; storage backend temporário do Playwright; nenhum listener em `11434` após a execução.
+- EPUB: fixture programática sintética de `1450` bytes, ZIP EPUB mínimo válido com `mimetype`, container, OPF e XHTML; termos `dragon`, `read` e `book`; arquivo e diretório temporários removidos no cleanup; SHA-256 real `35933801cc56b2500e4a36b25bffdcb876cc0c42a7b39b304d097442e96e40e4`.
+- Happy path: pela UI, login, “Adicionar livro”, seleção do EPUB, título/autor e submissão; `POST /api/books` `201`, `POST /api/books/{id}/content` `200`, início automático sem “Reprocessar léxico”, `POST /api/books/{id}/lexicon/jobs` `202`, polling por `GET /api/books/{id}/lexicon/jobs/latest` e estado terminal `COMPLETED`.
+- Evidência final do happy path: Book ID `39c87c44-6cac-4793-9dfe-eaa8f59bc3eb`; lookup `GET /api/books/{id}/lexicon/lookup?term=dragon` `200`; `lemma=dragon`, definição/localização/CEFR do dicionário local observados.
+- Falha de início automático: caracterização complementar com interceptação exclusiva do `POST /api/books/{id}/lexicon/jobs`, retornando `503` sintético; create/upload permaneceram reais (`201`/`200`) e a UI exibiu “Livro adicionado, mas o processamento não foi iniciado”. Nenhum endpoint de start foi chamado diretamente pelo teste.
+- Cleanup: prefixo `wave-3b-test-013-` aplicado ao `originalName` sintético e também aceito no helper API; confirmação final deixou `0` Books da fixture no banco e nenhum arquivo temporário da fixture.
+- Baseline antes das alterações: `npm run build` exit `0`; static tests total `5`, pass `5`, failures `0`, skipped `0`, exit `0`; TEST-001 Playwright pre-change terminou com status `passed` e `failedTests=[]`.`r`n- Comandos finais: `npm run build` exit `0`; static tests `node --test book-upload.test.mjs card-creation.test.mjs lexicon-entry-contract.test.mjs lexicon-lookup.test.mjs lexicon-start.test.mjs`, total `5`, pass `5`, failures `0`, skipped `0`, exit `0`; TEST-001 total `3`, pass `3`, failures `0`, skipped `0`, exit `0`; TEST-013 total `2`, pass `2`, failures `0`, skipped `0`, exit `0`, duração `28.5s`.
+- Artefatos: política compartilhada `screenshot=only-on-failure`, `trace=retain-on-failure`, video desligado; screenshots/traces de falhas intermediárias de harness foram usados na investigação e removidos, sem entrar no commit; execução final não produziu falha.
+- Divergências investigadas: pré-condição de login ausente, locator exato incompatível com o ícone acessível do botão e cleanup inicial baseado no hash real; classificadas como `TEST_INFRASTRUCTURE`, corrigidas somente nos testes/helpers. O residual identificado foi removido pelo UUID exato da fixture; nenhuma produção foi alterada.
+- TEST IDs alterados: somente `TEST-013`; `TEST-009`, `TEST-020`, `TEST-023`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados.
