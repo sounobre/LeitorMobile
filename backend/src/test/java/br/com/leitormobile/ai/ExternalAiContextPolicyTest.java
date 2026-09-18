@@ -1,6 +1,7 @@
 package br.com.leitormobile.ai;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,16 @@ class ExternalAiContextPolicyTest {
     void metadataTasksNeverCarryBookText() {
         ExternalContextDecision decision = policy.decideMetadataOnly(AiTaskType.PEDAGOGICAL_EXPLANATION, 3);
         assertTrue(decision.allowed());
+        assertFalse(decision.copyrightedTextRequired());
+        assertTrue(decision.excerpts().isEmpty());
+        assertEquals(0, decision.totalCharacters());
+    }
+
+    @Test
+    void metadataTasksWithNoCandidatesAreBlocked() {
+        ExternalContextDecision decision = policy.decideMetadataOnly(AiTaskType.PEDAGOGICAL_EXPLANATION, 0);
+
+        assertFalse(decision.allowed());
         assertFalse(decision.copyrightedTextRequired());
         assertTrue(decision.excerpts().isEmpty());
         assertEquals(0, decision.totalCharacters());
@@ -28,5 +39,8 @@ class ExternalAiContextPolicyTest {
     void longOrMultipleExcerptsAreBlocked() {
         assertFalse(policy.decideWithContext(AiTaskType.SENSE_RESOLUTION, List.of("one", "two")).allowed());
         assertFalse(policy.decideWithContext(AiTaskType.SENSE_RESOLUTION, List.of("x".repeat(601))).allowed());
+        assertFalse(policy.decideWithContext(AiTaskType.SENSE_RESOLUTION, List.of("")).allowed());
+        assertFalse(policy.decideWithContext(AiTaskType.SENSE_RESOLUTION, Collections.singletonList(null)).allowed());
+        assertFalse(policy.decideWithContext(AiTaskType.SENSE_RESOLUTION, null).allowed());
     }
 }
