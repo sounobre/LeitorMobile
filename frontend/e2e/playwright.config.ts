@@ -51,6 +51,7 @@ export default defineConfig({
         DATABASE_PASSWORD: databasePassword,
         APP_AUTH_EMAIL: authEmail,
         APP_AUTH_PASSWORD: authPassword,
+        APP_AI_ENABLED: 'false',
         APP_STORAGE_DIRECTORY: storageDirectory,
         CORS_ALLOWED_ORIGINS: frontendUrl,
         PORT: '8080',
