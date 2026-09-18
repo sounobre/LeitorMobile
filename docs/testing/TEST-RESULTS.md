@@ -390,3 +390,41 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Observação de `updatedAt`: o service usa `Instant.now()` na montagem de `EntryResponse`; foi validado somente presença e formato ISO-8601, sem comparação exata.
 - Observação documental: API-019 descrevia corpo JSON `null` para ausência, mas o comportamento HTTP observado foi corpo vazio com status `200`; o TEST-047 registra o comportamento efetivo e não altera produção.
 - TEST IDs alterados: somente `TEST-047` foi promovido para `PASS`; os PASS anteriores, incluindo `TEST-014`, foram preservados.
+
+
+
+## Wave 1D-B — AI provider and exposure
+
+- Status: `PASS`.
+- Base utilizada: `origin/main` / `381cfa521b9f9078cd35a5b6a9e79d4571465d48`.
+- Branch/worktree: `test/wave-1d-b-ai-contracts` / `D:\LeitorMobile\wave-1d-b-ai-contracts`.
+- Data/hora UTC do registro: `2026-09-18T14:25:56Z`.
+- Database/schema/usuário da regressão: `leitor_test` / `public` / `leitor_test_user`; identidade confirmada por `SELECT current_database(), current_schema(), current_user`.
+- Provider: somente `HttpServer` fake em `127.0.0.1` com porta dinâmica; nenhum Ollama real, porta `11434`, rede externa, OpenRouter ou API paga foi utilizado.
+
+### TEST-058
+
+- Status: `PASS`.
+- Cobertura no provider fake: resposta válida equivalente ao contrato `POST /api/chat`, com dois entries e `message.content` JSON estruturado; foram verificados quantidade, lemma, partOfSpeech, definition, translationPtBr, ipa, cefr, senseKey, confidence e os contadores `prompt_eval_count=17` / `eval_count=29`, expostos como input/output tokens.
+- Request capturado: método `POST`, path `/api/chat`, model `fake-model`, `stream=false`, messages presentes e `format` contendo o schema de entries.
+- Metadata-only: o request contém somente os metadados lexicais observáveis (lemma, POS e `bookFrequency`); o sentinela `PROTECTED_BOOK_EXCERPT_SHOULD_NOT_LEAVE` não apareceu no body. As policies confirmaram candidato válido permitido, `copyrightedTextRequired=false`, excerpts vazios e `totalCharacters=0`.
+- Timeout/indisponibilidade: o teste existente `failsWhenOllamaExceedsTheConfiguredReadTimeout` permaneceu verde e confirmou `OllamaUnavailableException`, sem resposta de sucesso. Resposta estruturada inválida também foi caracterizada como `OllamaUnavailableException`.
+- Comando dirigido exigido: `cd backend; mvn -q "-Dtest=OllamaAiProviderTest,ExternalAiContextPolicyTest,ExternalAiExposurePolicyTest" test`; total `11`, pass `11`, failures `0`, errors `0`, skipped `0`, exit code `0`.
+- Testes adicionais justificados pelo plano: `AiEnrichmentServiceTest` executou `2/2`; a extensão verificou que zero candidatos não chama o provider e que um candidato passa pelo caminho metadata-only e chama o provider mockado. Execução combinada: total `13`, pass `13`, failures `0`, errors `0`, skipped `0`, exit code `0`.
+
+### TEST-059
+
+- Status: `PASS`.
+- Purpose: `CHARACTERIZATION`; os resultados abaixo documentam o comportamento atual e não o transformam em acceptance futura.
+- No-candidate: `decideMetadataOnly(..., 0)` retorna decisão bloqueada, sem excerpts e sem caracteres; `AiEnrichmentService.enrich` retorna antes de chamar provider, progress writer, gate ou repositories.
+- Candidato válido: `decideMetadataOnly(..., 2/3)` retorna decisão permitida metadata-only, sem texto protegido; o serviço chama o provider mockado com lemma, POS e frequência, sem contexto de livro.
+- Contexto bloqueado: mais de um excerpt, excerpt acima de 600 caracteres, vazio, null ou lista null resultam em decisão bloqueada; nenhum desses excerpts foi enviado a servidor HTTP.
+- Exposure: decisão metadata-only não consome bucket; decisão bloqueada não consome bucket; ocorrência curta permitida reserva uma requisição, caracteres, excerpt, source sentence e reading unit; o limite existente continua bloqueando após 20 requisições permitidas. Não foram inventados thresholds.
+- Provider-call evidence: o teste unitário mínimo em `AiEnrichmentServiceTest` cobre a decisão no boundary real do serviço; não houve integração adicional nem arquitetura nova.
+
+### Verificação e observações
+
+- Regressão completa: `cd backend; mvn -q test`; exit code `0`; total `56`, pass `56`, failures `0`, errors `0`, skipped `0`; `20` relatórios em `backend/target/surefire-reports`. Database/schema/user confirmados como `leitor_test/public/leitor_test_user`.
+- O primeiro erro do teste adicional foi classificado como `TEST_INFRASTRUCTURE`: o serviço usa o bridge package-local `br.com.leitormobile.lexicon.OllamaAiProvider`; o harness foi corrigido para esse tipo sem alteração de produção ou de expectations.
+- `updatedAt` não é objeto desta wave; não foi criada assertion de timestamp exato.
+- TEST IDs alterados: somente `TEST-058` e `TEST-059`; `TEST-060`, `TEST-041` e `TEST-042` permanecem fora do escopo; nenhuma Wave 2 foi iniciada.
