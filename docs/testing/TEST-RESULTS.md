@@ -540,3 +540,29 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `TEST-042`: status final após fix `PASS`; verdict histórico `CONFIRMED`; bug state `FIXED`.
 - `BUG_CANDIDATE QUEUE_ORDER: CONFIRMED → FIXED`.
 - Nenhuma migration, schema, `CardService`, `Card`, `CardController`, query de listagem ou fixture de probe foi alterada; nenhum push, merge ou Wave 3 foi iniciado.
+
+## Wave 3A — Web E2E foundation
+
+- Status da wave: `PASS` para `TEST-001`; nenhum outro TEST da Wave 3 foi executado.
+- Base utilizada: `origin/main` / `32da59467950d2f136fe5cb6149b76f7848763d7`.
+- Branch/worktree: `test/wave-3a-web-e2e-login` / `D:\LeitorMobile-worktrees\wave-3a-web-e2e-login`.
+- Data/hora UTC do registro: `2026-09-18T18:29:28Z`.
+- Playwright: `@playwright/test` `1.62.1` adicionado como devDependency exata local do frontend; `npx --no-install playwright --version` retornou `1.62.1`.
+- Browser: Chromium local do Playwright, Chrome for Testing `151.0.7922.34` / Chromium runtime `v1234`; instalado somente o projeto Chromium pelo mecanismo oficial (Chrome for Testing e headless shell); Firefox/WebKit não foram instalados.
+- URLs: backend `http://127.0.0.1:8080`; frontend `http://127.0.0.1:5173`; `VITE_API_URL=http://127.0.0.1:8080/api`.
+- Database/schema/usuário: `leitor_test` / `public` / `leitor_test_user`; o backend E2E foi iniciado com profile `test` e senha somente via ambiente.
+- Conta de teste: `APP_AUTH_EMAIL` e `APP_AUTH_PASSWORD` foram injetados no processo como valores sintéticos gerados por execução; nenhum email/senha/token foi gravado no repositório ou no ledger.
+- Storage: `APP_STORAGE_DIRECTORY` apontou para diretório temporário por processo em `%TEMP%/LeitorMobile-wave-3a/<pid>`; o storage de desenvolvimento não foi usado.
+- Reset/isolation: cada teste usa contexto de browser novo; antes/depois, o cliente API remove somente livros do owner de teste cujo `fileHash` começa com `wave-3a-test-001-`; a conta sintética é exclusiva da execução.
+- Artifacts policy: screenshot `only-on-failure`, trace `retain-on-failure`, video desligado; screenshot/trace foram gerados durante uma falha intermediária e removidos após a correção, sem entrar no commit.
+
+### TEST-001
+
+- Status: `PASS`.
+- Cenários: login UI válido; sessão persistida em `leitor.auth.token`/`leitor.auth.user` verificada estruturalmente; reload sem retorno ao LoginView; biblioteca vazia com `Sua biblioteca está vazia`; livro sintético sem upload criado por API e exibido com título/autor; logout caracterizado com limpeza do localStorage e reload deslogado; senha inválida caracterizada com `role=alert`, permanência no login e nenhuma sessão local.
+- Network endpoints observados: `POST /api/auth/login`, `GET /api/auth/me` e `GET /api/books`; nenhum Authorization/token foi registrado.
+- Comando final: `cd frontend; npx --no-install playwright test --config=e2e/playwright.config.ts e2e/specs/library.spec.ts --grep "TEST-001"`.
+- Resultado final: browser Chromium; total `3`, pass `3`, failures `0`, skipped `0`, exit code `0`; duração observada `27.5s` na verificação final.
+- Frontend baseline antes e após o E2E: `npm run build` exit code `0` em ambas as execuções; static tests `node --test book-upload.test.mjs card-creation.test.mjs lexicon-entry-contract.test.mjs lexicon-lookup.test.mjs lexicon-start.test.mjs`, total `5`, pass `5`, failures `0`, skipped `0`, exit code `0` antes e após o E2E.
+- Divergências investigadas: a primeira execução omitiu `--config` e falhou com `ECONNREFUSED` porque os webServers não foram carregados; o config ESM foi ajustado para `import.meta.url`; a mensagem textual esperada para login inválido foi removida após observar que o frontend expõe o fallback HTTP `401`. Classificações: `TEST_INFRASTRUCTURE` nas duas primeiras ocorrências de harness/config e `TEST_EXPECTATION_ERROR` na mensagem; nenhuma alteração de produção.
+- TEST IDs alterados: somente `TEST-001`; `TEST-009`, `TEST-013`, `TEST-020`, `TEST-023`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados.
