@@ -449,3 +449,50 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Fixtures/sessão: usuário e token Bearer sintéticos por teste; somente o hash do token foi persistido; cleanup removeu exclusivamente a sessão e o usuário criados pela classe.
 - Regressão completa: `cd backend; mvn -q test`; exit code `0`; total `61`, pass `61`, failures `0`, errors `0`, skipped `0`; `21` relatórios Surefire em `backend/target/surefire-reports`.
 - TEST IDs alterados: somente `TEST-060` foi promovido para `PASS`; `TEST-041` e `TEST-042` permanecem `NOT_RUN` e nenhuma Wave 2 foi iniciada.
+
+## Wave 2 — queueOrder defect probes
+
+- Status da wave: `FAIL` por `PRODUCT_BUG_CANDIDATE` confirmado; nenhum arquivo de produção, migration ou schema foi alterado.
+- Base utilizada: `origin/main` / `3b80d29201525466306a3114aac7c7990dd61cd3`.
+- Branch/worktree: `test/wave-2-queue-order-probes` / `D:\LeitorMobile-worktrees\wave-2-queue-order-probes`.
+- Data/hora UTC do registro: `2026-09-18T16:14:44Z`.
+- Database/schema/usuário: `leitor_test` / `public` / `leitor_test_user`; identidade confirmada após os probes.
+- Baseline antes dos probes: `mvn -q test`, exit code `0`; total `61`, pass `61`, failures `0`, errors `0`, skipped `0`; `21` relatórios Surefire.
+
+### TEST-041
+
+- Status: `FAIL`.
+- Verdict: `CONFIRMED`.
+- Fixture: owner sintético, livro autorizado sem cards ativos e sessão Bearer sintética; três criações sequenciais passaram pelo `POST /api/cards`, sem concorrência e sem `sleep`.
+- Created cards: `queue-create-card-1` (`fb7339ed-4277-4fc7-8d4e-f60e3ccfbc4e`), `queue-create-card-2` (`352d1777-b36e-45f3-a10e-9d44e54ffa6a`) e `queue-create-card-3` (`7422fd17-46b0-43a1-b943-3aff113b36a3`).
+- Valores persistidos: `-1, -1, -1`; os `createdAt` foram distinguíveis e a ordem retornada por `findActive(ownerId)` foi `queue-create-card-1`, `queue-create-card-2`, `queue-create-card-3`, todos com `queueOrder=-1`.
+- Diagnostics: `findNextQueueOrder` antes de cada criação `[-1, -1, -1]`; depois de cada criação `[-1, -1, -1]`.
+- Primeiro ponto de divergência: `CardRepository.findNextQueueOrder` executa `coalesce(max(c.queueOrder), -1)` e retorna `-1` para o owner vazio; `CardService.create` passa esse retorno diretamente ao construtor `Card`, que persiste o mesmo valor. O valor anômalo surge no boundary repository → service/construtor, antes da listagem.
+- Comando: `cd backend; mvn -q -Dtest=CardQueueOrderProbeTest test`; exit code `1`; total `1`, pass `0`, failures `1`, errors `0`, skipped `0`.
+- Repetibilidade: uma segunda execução independente reproduziu `-1,-1,-1`; a execução combinada também reproduziu o mesmo resultado.
+
+### TEST-042
+
+- Status: `FAIL`.
+- Verdict: `CONFIRMED`.
+- Fixture independente: três cards persistidos diretamente pelo harness com `queueOrder` diagnóstico `10,20,30`, todos do mesmo owner/livro; createdAt/updatedAt foram registrados.
+- Ordem inicial: `[queue-move-card-a(10), queue-move-card-b(20), queue-move-card-c(30)]` conforme `findActive(ownerId)`; os queueOrders persistidos eram `10,20,30`.
+- Operação: `POST /api/cards/{A}/move-to-end` recebeu `200`; `findNextQueueOrder` antes retornou `30`.
+- Valores finais: A recebeu `30`, C permaneceu `30`, B permaneceu `20`; `findNextQueueOrder` depois continuou `30`.
+- Ordem final: `[queue-move-card-b(20), queue-move-card-a(30), queue-move-card-c(30)]`; o card movido não terminou estritamente após o antigo último e compartilhou `queueOrder=30`.
+- Primeiro ponto de divergência: `CardService.moveToEnd` passa diretamente ao `Card.moveToEnd` o `max(queueOrder)=30`; `Card.moveToEnd` persiste esse valor sem distingui-lo do antigo último. `CardRepository.findActive` ordena por `queueOrder asc, createdAt asc`, por isso A, criado antes de C, aparece antes de C no empate.
+- Comando: `cd backend; mvn -q -Dtest=CardMoveToEndProbeTest test`; exit code `1`; total `1`, pass `0`, failures `1`, errors `0`, skipped `0`.
+- A execução combinada `cd backend; mvn -q "-Dtest=CardQueueOrderProbeTest,CardMoveToEndProbeTest" test` teve exit code `1`; total `2`, pass `0`, failures `2`, errors `0`, skipped `0`.
+
+### BUG_CANDIDATE QUEUE_ORDER
+
+- Status: `CONFIRMED`.
+- Observed: criação sequencial sem cards ativos produz `queueOrder=-1` repetido; move-to-end com fixture `10,20,30` produz `30,20,30` e ordem final `B,A,C`.
+- Trace: request real → `CardService.create`/`moveToEnd` → `CardRepository.findNextQueueOrder` → valor retornado → `Card` constructor/`Card.moveToEnd` → persistência → `findActive`.
+- Hypothesis: os call sites usam o valor retornado pela query de máximo como se ele já fosse um próximo queueOrder distinguível; esta é uma hipótese causal baseada na evidência, não uma prescrição de correção. Nenhuma solução, incluindo `MAX + 1`, foi escolhida ou implementada.
+
+### Verificação e escopo
+
+- `CardControllerTest` após os probes: PASS; `mvn -q -Dtest=CardControllerTest test`; exit code `0`; total `5`, pass `5`, failures `0`, errors `0`, skipped `0`.
+- Não foi executado `mvn -q test` após os probes, porque ambos falham intencionalmente para preservar a evidência do defeito confirmado; a baseline limpa de `61/61` está registrada acima.
+- TEST IDs alterados: somente `TEST-041` e `TEST-042`; ambos permanecem probes `DEFECT_PROBE`, não acceptance. Nenhuma Wave posterior foi iniciada.
