@@ -82,9 +82,9 @@ export type SyntheticEpub = {
   cleanup: () => Promise<void>;
 };
 
-export async function createSyntheticEpub(): Promise<SyntheticEpub> {
-  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'wave-3b-test-013-'));
-  const filePath = path.join(temporaryDirectory, 'wave-3b-test-013-synthetic-dragon.epub');
+export async function createSyntheticEpub(prefix = 'wave-3b-test-013-'): Promise<SyntheticEpub> {
+  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
+  const filePath = path.join(temporaryDirectory, prefix + 'synthetic-dragon.epub');
   const entries: ZipEntry[] = [
     { name: 'mimetype', data: Buffer.from('application/epub+zip', 'utf8') },
     {

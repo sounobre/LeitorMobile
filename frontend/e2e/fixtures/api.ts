@@ -24,6 +24,11 @@ export type CreateBookInput = {
   language: string;
 };
 
+export type UploadBookContentInput = {
+  epub: { name: string; mimeType: string; buffer: Buffer };
+  cover?: { name: string; mimeType: string; buffer: Buffer };
+};
+
 export type ApiLexiconJob = {
   id: string;
   bookId: string;
@@ -91,6 +96,13 @@ export function createApiClient(request: APIRequestContext) {
         headers: { Authorization: `Bearer ${token}` },
       });
       return { status: response.status(), body: await readJson<ApiLexiconEntry | null>(response) };
+    },
+
+    async uploadBookContent(token: string, bookId: string, input: UploadBookContentInput): Promise<ApiBook> {
+      return readJson<ApiBook>(await request.post(`${apiUrl}/books/${bookId}/content`, {
+        headers: { Authorization: `Bearer ${token}` },
+        multipart: input,
+      }));
     },
 
     async deleteBook(token: string, id: string): Promise<void> {
