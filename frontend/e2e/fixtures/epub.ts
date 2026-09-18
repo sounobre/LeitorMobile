@@ -110,3 +110,40 @@ export async function createSyntheticEpub(prefix = 'wave-3b-test-013-'): Promise
     cleanup: async () => fs.rm(temporaryDirectory, { recursive: true, force: true }),
   };
 }
+
+export async function createSyntheticReaderEpub(prefix = 'wave-3d-test-023-'): Promise<SyntheticEpub> {
+  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
+  const filePath = path.join(temporaryDirectory, prefix + 'synthetic-reader.epub');
+  const entries: ZipEntry[] = [
+    { name: 'mimetype', data: Buffer.from('application/epub+zip', 'utf8') },
+    {
+      name: 'META-INF/container.xml',
+      data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>', 'utf8'),
+    },
+    {
+      name: 'OEBPS/content.opf',
+      data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="pub-id">urn:uuid:wave-3d-test-023</dc:identifier><dc:title>Wave 3D Synthetic Reader</dc:title><dc:language>en</dc:language></metadata><manifest><item id="chapter1" href="chapter-1.xhtml" media-type="application/xhtml+xml"/><item id="chapter2" href="chapter-2.xhtml" media-type="application/xhtml+xml"/><item id="chapter3" href="chapter-3.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter1"/><itemref idref="chapter2"/><itemref idref="chapter3"/></spine></package>', 'utf8'),
+    },
+    {
+      name: 'OEBPS/chapter-1.xhtml',
+      data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Wave 3D Chapter One</title></head><body><h1>Chapter One</h1><p>WAVE3D_CHAPTER_ONE_SENTINEL</p></body></html>', 'utf8'),
+    },
+    {
+      name: 'OEBPS/chapter-2.xhtml',
+      data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Wave 3D Chapter Two</title></head><body><h1>Chapter Two</h1><p>WAVE3D_CHAPTER_TWO_SENTINEL</p></body></html>', 'utf8'),
+    },
+    {
+      name: 'OEBPS/chapter-3.xhtml',
+      data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Wave 3D Chapter Three</title></head><body><h1>Chapter Three</h1><p>WAVE3D_CHAPTER_THREE_SENTINEL</p></body></html>', 'utf8'),
+    },
+  ];
+  const bytes = buildStoredZip(entries);
+  await fs.writeFile(filePath, bytes);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  return {
+    path: filePath,
+    size: bytes.length,
+    sha256,
+    cleanup: async () => fs.rm(temporaryDirectory, { recursive: true, force: true }),
+  };
+}
