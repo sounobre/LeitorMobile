@@ -340,3 +340,28 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Regressão completa: `cd backend; mvn -q test`; total `38`, pass `38`, failures `0`, errors `0`, skipped `0`, exit code `0`; `17` relatórios Surefire.
 - TEST IDs preservados: `TEST-002=PASS`, `TEST-003=PASS`, `TEST-012=PASS`, `TEST-026=PASS`; nenhum outro TEST ID foi promovido ou alterado.
 - Arquivos de produção, migrations, `application-test.yml`, `PostgresIntegrationTestSupport`, `backend/data/library` e testes existentes não relacionados não foram alterados.
+
+## Wave 1C — Card API contracts
+
+- Base utilizada: `origin/main` / `d7a3fc6d7fd89648604721a911cd329e4d862ae2`.
+- Branch/worktree: `test/wave-1c-card-contracts` / `D:\LeitorMobile\wave-1c-worktree`.
+- Data/hora UTC do registro: `2026-09-18T13:14:00Z`.
+- Profile: `test`, ativado por `PostgresIntegrationTestSupport`.
+- Database/schema/usuário confirmados antes e depois: `leitor_test` / `public` / `leitor_test_user`; consulta final: `SELECT current_database(), current_schema(), current_user`.
+- Fixtures: dois owners, dois livros pertencentes a owners distintos e sessões Bearer sintéticas por teste; nenhum segredo real foi gravado.
+- Cleanup: somente IDs de cards/livros e sessões/usuários criados pelo teste.
+
+### TEST-040
+
+- Status: `PASS`.
+- Cenários executados: listagem por owner com default/includeArchived, isolamento entre owners, criação válida e defaults para opcionais nulos, validação de `bookId`/`cfiRange`/`selectedText`, livro inexistente/alheio, update próprio e preservação de livro/CFI/capítulo, selectedText inválido, card inexistente/alheio, archive/unarchive com efeitos de estado/listagem, move-to-end com acesso próprio e rejeições de ID/owner/sessão.
+- Testes específicos: 5 testes em `backend/src/test/java/br/com/leitormobile/card/CardControllerTest.java`.
+- Comando direcionado: `cd backend; mvn -q -Dtest=CardControllerTest test`; exit code `0`; total `5`, pass `5`, failures `0`, errors `0`, skipped `0`.
+- Evidência: respostas observadas conforme catálogo: `200` para listagem/mutações válidas, `201` para criação, `400` para Bean Validation, `401` para sessão ausente/inválida e `404` para livro/card inexistente ou pertencente a outro owner. A listagem foi comparada por conjunto de IDs e conteúdo, sem posição.
+- Efeitos negativos verificados: nenhuma criação parcial; contagens de cards dos dois owners permaneceram inalteradas nos negativos; card próprio permaneceu inalterado após update inválido/sem autorização; card alheio permaneceu intacto; estados `archived` não mudaram em operações negativas; livro alheio não foi usado para criar card.
+- Regressão completa: `cd backend; mvn -q test`; exit code `0`; total `43`, pass `43`, failures `0`, errors `0`, skipped `0`; `18` relatórios Surefire em `backend/target/surefire-reports`.
+- Regressão inclui os PASS preservados: `TEST-002`, `TEST-003`, `TEST-010`, `TEST-012`, `TEST-014`, `TEST-015`, `TEST-021`, `TEST-024` e `TEST-026`.
+
+### QUEUE_ORDER_OBSERVATION
+
+- Nenhuma observação incidental foi promovida: TEST-040 não inspeciona valor, unicidade, crescimento, posição relativa ou algoritmo de fila. TEST-041 e TEST-042 permanecem fora desta wave.
