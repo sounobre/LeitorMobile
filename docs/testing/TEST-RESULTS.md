@@ -586,3 +586,25 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Artefatos: política compartilhada `screenshot=only-on-failure`, `trace=retain-on-failure`, video desligado; screenshots/traces de falhas intermediárias de harness foram usados na investigação e removidos, sem entrar no commit; execução final não produziu falha.
 - Divergências investigadas: pré-condição de login ausente, locator exato incompatível com o ícone acessível do botão e cleanup inicial baseado no hash real; classificadas como `TEST_INFRASTRUCTURE`, corrigidas somente nos testes/helpers. O residual identificado foi removido pelo UUID exato da fixture; nenhuma produção foi alterada.
 - TEST IDs alterados: somente `TEST-013`; `TEST-009`, `TEST-020`, `TEST-023`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados.
+
+## Wave 3C — Web book deletion
+
+### TEST-020
+
+- Status: `PASS`.
+- Base utilizada: `origin/main` / `8a648f31765589020325d47c4cf5362a09a899f7`.
+- Branch/worktree: `test/wave-3c-web-e2e-delete` / `D:\LeitorMobile-worktrees\wave-3c-web-e2e-delete`.
+- Data/hora UTC do registro: `2026-09-18T21:12:12Z`.
+- Ambiente: Playwright `1.62.1`, Chromium local (`v1234`), backend `http://127.0.0.1:8080`, frontend `http://127.0.0.1:5173`, database `leitor_test`, schema `public`, usuário `leitor_test_user`, `APP_AI_ENABLED=false`; nenhum storage de desenvolvimento ou Ollama foi usado.
+- Storage: o config de Playwright compartilha `E2E_STORAGE_DIRECTORY` com `APP_STORAGE_DIRECTORY`; o path observado foi `%TEMP%/LeitorMobile-wave-3c/<worker-pid>`, exatamente o mesmo path usado pelo backend e pelo teste. O storage de desenvolvimento `backend/data/library` não foi tocado.
+- Fixture: Book sintético com prefixo `wave-3c-test-020-`, EPUB mínimo real gerado por `createSyntheticEpub()` e hash SHA-256 calculado sobre os bytes; upload multipart real de EPUB e capa JPG sintética; capa stale PNG criada diretamente no storage; sentinel PNG não pertencente ao Book. Não houve job lexical.
+- Book ID da verificação final: `2fa2c459-22b6-42e3-a971-b480f73ebb2e`.
+- Filesystem pré-delete: `books/{id}.epub`, `covers/{id}.jpg`, `covers/{id}.png` e `covers/wave-3c-unrelated-sentinel.png` existiam.
+- Caminho web: login, biblioteca, “Opcoes do livro”, “Excluir livro” e confirmação nativa `window.confirm`; a exclusão não foi chamada diretamente pela API. Request observado: `DELETE /api/books/{id}` com HTTP `204`.
+- Resultado UI/DB: o título deixou de aparecer e a biblioteca ficou vazia; `listBooks()` autenticado não retornou o `bookId`.
+- Filesystem pós-delete: EPUB, JPG atual e PNG stale não existiam; o sentinel continuou existindo. O cleanup final removeu o sentinel e qualquer residual da fixture.
+- Comandos focados/finais: `node_modules/.bin/playwright.cmd test --config=e2e/playwright.config.ts e2e/specs/library.spec.ts --grep "TEST-020"`; execução focada final total `1`, pass `1`, failures `0`, skipped `0`, exit code `0`, duração `23.3s`.
+- Regressão web: `npm run build` exit `0`; static tests total `5`, pass `5`, failures `0`, skipped `0`, exit `0`; TEST-001 total `3`, pass `3`, failures `0`, skipped `0`, exit `0`, duração `26.7s`; TEST-013 total `2`, pass `2`, failures `0`, skipped `0`, exit `0`, duração `25.5s`; TEST-020 total `1`, pass `1`, failures `0`, skipped `0`, exit `0`.
+- Artefatos: screenshot `only-on-failure`, trace `retain-on-failure`, video desligado; as duas falhas intermediárias foram classificadas como `TEST_INFRASTRUCTURE` (expressão de fixture atravessada pelo shell e sincronização do dialog) e corrigidas no harness; a verificação final não produziu falha/artifact pendente.
+- Arquivos alterados: somente harness/spec/fixture E2E e este ledger; nenhum arquivo de produção backend/frontend foi alterado.
+- TEST IDs alterados: somente `TEST-020`; `TEST-009`, `TEST-023`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados. `TEST-001` e `TEST-013` foram somente revalidados como regressão e permanecem `PASS`.

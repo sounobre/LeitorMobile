@@ -15,7 +15,8 @@ const authPassword = requiredEnv('APP_AUTH_PASSWORD');
 const backendUrl = 'http://127.0.0.1:8080';
 const frontendUrl = 'http://127.0.0.1:5173';
 const apiUrl = `${backendUrl}/api`;
-const storageDirectory = path.join(os.tmpdir(), 'LeitorMobile-wave-3a', String(process.pid));
+const storageDirectory = path.resolve(process.env.E2E_STORAGE_DIRECTORY?.trim() || path.join(os.tmpdir(), 'LeitorMobile-wave-3c', String(process.pid)));
+process.env.E2E_STORAGE_DIRECTORY = storageDirectory;
 const configDirectory = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
