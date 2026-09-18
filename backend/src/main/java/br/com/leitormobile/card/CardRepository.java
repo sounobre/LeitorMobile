@@ -15,7 +15,7 @@ public interface CardRepository extends JpaRepository<Card, UUID> {
     @Query("select c from Card c where c.book.owner.id = :ownerId order by c.archived asc, c.queueOrder asc, c.createdAt asc")
     List<Card> findAllForOwner(@Param("ownerId") UUID ownerId);
 
-    @Query("select coalesce(max(c.queueOrder), -1) from Card c where c.archived = false and c.book.owner.id = :ownerId")
+    @Query("select coalesce(max(c.queueOrder), -1) + 1 from Card c where c.archived = false and c.book.owner.id = :ownerId")
     int findNextQueueOrder(@Param("ownerId") UUID ownerId);
 
     Optional<Card> findByIdAndBookOwnerId(UUID id, UUID ownerId);
