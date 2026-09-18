@@ -299,7 +299,7 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Cenários: criação válida, owner derivado da sessão, `originalName` obrigatório/blank, trim de `fileHash`, `manual:<UUID>` para hash blank, defaults e normalizações, duplicidade no mesmo owner, comportamento observado de mesma hash entre owners e criação sem autenticação.
 - Testes: `createBookAppliesApi004DefaultsAndBindsTheCurrentOwner`, `createBookTrimsExplicitHashRejectsDuplicatesAndObservesCrossOwnerConstraint`, `createBookRequiresOriginalNameAndAuthenticatedOwner`.
 - Testes específicos: 3 testes (`createBookAppliesApi004DefaultsAndBindsTheCurrentOwner`, `createBookTrimsExplicitHashRejectsDuplicatesAndObservesCrossOwnerConstraint`, `createBookRequiresOriginalNameAndAuthenticatedOwner`). Comando: `cd backend; mvn -q -Dtest=BookControllerApiTest test`; harness com `tests=13`, `failures=0`, `errors=0`, `skipped=0`, exit code `0`.
-- Evidência/efeitos: registro criado pertence ao owner da sessão; request não usa campo `owner`; EPUB/SHA não foram incluídos. A mesma hash entre owners foi observada como `409` nesta configuração de schema, sem assumir regra diferente.
+- Evidência/efeitos: registro criado pertence ao owner da sessão; request não usa campo `owner`; EPUB/SHA não foram incluídos. Uma observação inicial registrou `409`; esse registro foi posteriormente classificado como `TEST_EXPECTATION_ERROR` e superseded pelo hardening abaixo, que confirmou `201` para owners diferentes.
 - Observação de investigação: o fallback de título usa o `originalName` antes do trim/remoção de extensão; a assertion foi alinhada ao valor efetivamente observado, sem alteração de produção.
 
 ### Wave 1B — TEST-014 contract hardening
@@ -365,3 +365,28 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 ### QUEUE_ORDER_OBSERVATION
 
 - Nenhuma observação incidental foi promovida: TEST-040 não inspeciona valor, unicidade, crescimento, posição relativa ou algoritmo de fila. TEST-041 e TEST-042 permanecem fora desta wave.
+
+## Wave 1D-A — Persisted lexicon HTTP contract
+
+- Status: `PASS`.
+- Base utilizada: `origin/main` / `f6b712e072183f56e61b864ee98f9e43ab2cd188`.
+- Branch/worktree: `test/wave-1d-a-lexicon-contract` / `D:\LeitorMobile-worktrees\wave-1d-a-lexicon-contract`.
+- Data/hora UTC do registro: `2026-09-18T13:56:56Z`.
+- Database/schema/usuário: `leitor_test` / `public` / `leitor_test_user`; confirmados antes e depois com `SELECT current_database(), current_schema(), current_user`.
+- Profile: `test`, ativado por `PostgresIntegrationTestSupport`; Flyway validou 6 migrations no banco isolado, sem alteração de migrations.
+- Fixtures: dois owners, dois livros de owners distintos e sessões Bearer sintéticas; OWNER_A tem uma entrada completa persistida com dois word forms, dictionary entry, dois senses, frequência 7, `RESOLVED_LOCAL` e `CORE`, além de uma entrada auxiliar; OWNER_B tem livro e entrada lexical distinguível. Nenhum job lexical foi executado e nenhum segredo real foi gravado.
+- Cleanup: somente usuários/sessões, livros, BookLexemes, lexemes, word forms, dictionary entry e senses criados pela fixture.
+
+### TEST-047
+
+- Cenários de list: default e `search=`; busca por lemma com trim/case; resultado vazio; `limit=1`; ownership entre os dois livros; livro de outro owner; entradas e IDs comparados por conjunto/conteúdo.
+- Campos verificados: `id`, `bookId`, `lemma`, `partOfSpeech`, `wordForms`, `definition`, `translationPtBr`, `ipa`, `cefr`, `bookFrequency`, `firstSentenceId` nulo por ausência de fixture de sentence, `resolutionStatus`, `pedagogicalRelevance` e os dois senses persistidos (`senseKey`, definition e translationPtBr).
+- Cenários de lookup: lemma existente; word form existente com trim/case-insensitive; termo inexistente; termo blank; parâmetro `term` ausente; livro inexistente; livro de outro owner; sessão ausente e Bearer inválido.
+- Ownership: nenhuma entrada de OWNER_B apareceu nas respostas de OWNER_A; chamadas a livro alheio/inexistente retornaram `404` conforme o fluxo `ownedBook`.
+- Ausência: lookup sem match/blank retornou `200` com corpo HTTP vazio na execução real do Spring MVC; o parâmetro ausente retornou `400`. Nenhum payload de ausência foi inventado.
+- Efeitos negativos: snapshots de BookLexeme, word forms, dictionary-entry IDs e senses permaneceram iguais antes/depois das leituras e chamadas rejeitadas.
+- Comando direcionado: `cd backend; mvn -q -Dtest=LexiconControllerTest test`; exit code `0`; total `5`, pass `5`, failures `0`, errors `0`, skipped `0`.
+- Regressão completa: `cd backend; mvn -q test`; exit code `0`; total `48`, pass `48`, failures `0`, errors `0`, skipped `0`; `19` relatórios em `backend/target/surefire-reports`.
+- Observação de `updatedAt`: o service usa `Instant.now()` na montagem de `EntryResponse`; foi validado somente presença e formato ISO-8601, sem comparação exata.
+- Observação documental: API-019 descrevia corpo JSON `null` para ausência, mas o comportamento HTTP observado foi corpo vazio com status `200`; o TEST-047 registra o comportamento efetivo e não altera produção.
+- TEST IDs alterados: somente `TEST-047` foi promovido para `PASS`; os PASS anteriores, incluindo `TEST-014`, foram preservados.
