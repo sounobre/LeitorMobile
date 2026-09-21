@@ -108,6 +108,11 @@ function App() {
   const bookCountLabel = `${books.length} ${books.length === 1 ? 'livro' : 'livros'}`;
   const cardCountLabel = `${cards.length} ${cards.length === 1 ? 'card' : 'cards'} na fila`;
 
+  function handleBookProgressUpdated(updatedBook: Book) {
+    setBooks((items) => items.map((item) => item.id === updatedBook.id ? updatedBook : item));
+    setReadingBook((current) => current?.id === updatedBook.id ? updatedBook : current);
+  }
+
   async function handleCreateBook(event: FormEvent) {
     event.preventDefault();
     if (submittingBook) return;
@@ -273,7 +278,7 @@ function App() {
       {showBookForm ? <BookForm value={bookForm} onChange={setBookForm} onSubmit={(event) => void handleCreateBook(event)} onClose={() => { if (!submittingBook) setShowBookForm(false); }} submitting={submittingBook} /> : null}
       {editingCard ? <CardEditor card={editingCard} onSave={(input) => void handleSaveCard(input)} onClose={() => setEditingCard(null)} /> : null}
       {detailsBook ? <BookProcessingDetailsModal book={detailsBook} job={lexiconJobs[detailsBook.id]} onLookup={(term) => lookupBookLexicon(detailsBook.id, term)} onClose={() => setDetailsBook(null)} /> : null}
-      {readingBook ? <EpubReader book={readingBook} onClose={() => setReadingBook(null)} onCardCreated={(card) => setCards((items) => items.some((item) => item.id === card.id) ? items : [card, ...items])} /> : null}
+      {readingBook ? <EpubReader book={readingBook} onClose={() => setReadingBook(null)} onProgressUpdated={handleBookProgressUpdated} onCardCreated={(card) => setCards((items) => items.some((item) => item.id === card.id) ? items : [card, ...items])} /> : null}
     </div>
   );
 }
