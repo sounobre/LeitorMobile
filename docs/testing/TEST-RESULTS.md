@@ -608,3 +608,30 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Artefatos: screenshot `only-on-failure`, trace `retain-on-failure`, video desligado; as duas falhas intermediárias foram classificadas como `TEST_INFRASTRUCTURE` (expressão de fixture atravessada pelo shell e sincronização do dialog) e corrigidas no harness; a verificação final não produziu falha/artifact pendente.
 - Arquivos alterados: somente harness/spec/fixture E2E e este ledger; nenhum arquivo de produção backend/frontend foi alterado.
 - TEST IDs alterados: somente `TEST-020`; `TEST-009`, `TEST-023`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados. `TEST-001` e `TEST-013` foram somente revalidados como regressão e permanecem `PASS`.
+
+## Wave 3D — Web EPUB reader and progress
+
+### TEST-023
+
+- Status: `FAIL` — `PRODUCT_BUG_CANDIDATE` confirmado no caminho principal de restauração na mesma sessão.
+- Base utilizada: `origin/main` / `87cae1e92272d0db1f5cefd93379853de152216b`; branch/worktree: `test/wave-3d-web-e2e-reader` / `D:\LeitorMobile-worktrees\wave-3d-web-e2e-reader`.
+- Data/hora UTC do registro: `2026-09-18T22:28:49Z`.
+- Ambiente: Playwright `1.62.1`, Chromium local (`v1234`), backend `http://127.0.0.1:8080`, frontend `http://127.0.0.1:5173`, database `leitor_test`, schema `public`, usuário `leitor_test_user`, `APP_AI_ENABLED=false`; nenhum Ollama, rede externa ou storage de desenvolvimento foi usado.
+- Fixture: EPUB sintético mínimo com SHA-256 real, três itens no spine e sentinelas `WAVE3D_CHAPTER_ONE_SENTINEL`, `WAVE3D_CHAPTER_TWO_SENTINEL` e `WAVE3D_CHAPTER_THREE_SENTINEL`; prefixo de cleanup `wave-3d-test-023-`; nenhum material protegido.
+
+#### Acceptance path
+
+- First open: `GET /api/books/{id}/file` recebeu `200`; o primeiro capítulo foi renderizado dentro do iframe do epub.js; `CFI_1` foi não blank e tratado como string opaca; o primeiro `PATCH /api/books/{id}/progress` recebeu `200` e o progress observado ficou em `[0,1]`.
+- Navigation: o clique em `Próxima` renderizou o segundo capítulo; um novo `PATCH /api/books/{id}/progress` recebeu `200`; `CFI_2 != CFI_1`; a API confirmou `lastCfi=CFI_2` e `progress` persistido em `[0,1]`.
+- Same-session reopen: o reader foi fechado e reaberto pelo fluxo normal, sem `page.reload()`, sem PATCH manual e sem atualizar localStorage. O segundo capítulo não foi restaurado; a assertion principal falhou de forma determinística. Portanto o TEST-023 não pode ser promovido para PASS.
+- Primeiro ponto de divergência: `EpubReader` capturou `relocated` e persistiu `CFI_2` via `PATCH`; o backend manteve o estado salvo. Ao fechar, `App` não atualiza o item correspondente em `books`; ao reabrir na mesma sessão, `readingBook` ainda contém o Book antigo sem `lastCfi`, e `EpubReader` chama `rendition.display(undefined)`, iniciando no capítulo 1.
+
+#### Diagnostic and missing-file characterization
+
+- Diagnostic reload: executado somente após a falha principal. Após `page.reload()`, o Book foi recarregado do backend e o capítulo 2 foi restaurado (`reloadRestore=YES`). Isso confirma a persistência backend, mas não transforma a falha de same-session reopen em PASS.
+- Missing file: o Book sem EPUB recebeu `GET /api/books/{id}/file` `401` tanto pelo helper autenticado quanto pelo browser autenticado (`authHeaderPresent=true`); a UI mostrou `Não foi possível abrir o livro.` e permitiu `Voltar à biblioteca`. O código/backend test existente documenta `404` para a ausência de arquivo em outro boundary, então a diferença runtime `401` vs `404` foi registrada sem inventar expectation nem alterar produção.
+- Repetibilidade: a execução completa foi repetida duas vezes; em ambas o cenário principal falhou e os dois cenários de diagnóstico/caracterização passaram. A execução final focada teve total `3`, pass `2`, failures `1`, errors `0`, skipped `0`, exit code `1`.
+- Comando focado: `cd frontend; node_modules/.bin/playwright.cmd test --config=e2e/playwright.config.ts e2e/specs/reader.spec.ts --grep "TEST-023" --reporter=line`; duração observada `54.5s` na segunda confirmação.
+- Regressão da fundação após as alterações: TEST-001 total `3`, pass `3`, failures `0`, skipped `0`, exit code `0`; TEST-013 total `2`, pass `2`, failures `0`, skipped `0`, exit code `0`; TEST-020 total `1`, pass `1`, failures `0`, skipped `0`, exit code `0`.
+- TEST IDs alterados: somente `TEST-023`; `TEST-009`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados. `TEST-001`, `TEST-013` e `TEST-020` foram apenas revalidados.
+- Classificações: restauração na mesma sessão = `PRODUCT_BUG_CANDIDATE`; diferença de status no missing-file = divergência de contrato/runtime observada, sem mudança de expectation ou produção; nenhuma mudança de produção foi feita.

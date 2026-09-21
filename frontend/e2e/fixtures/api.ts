@@ -14,6 +14,11 @@ export type ApiBook = {
   originalName: string;
   title: string;
   author: string;
+  language?: string;
+  lastCfi?: string | null;
+  progress?: number;
+  fileAvailable?: boolean;
+  coverAvailable?: boolean;
 };
 
 export type CreateBookInput = {
@@ -105,6 +110,12 @@ export function createApiClient(request: APIRequestContext) {
       }));
     },
 
+    async getBookFileStatus(token: string, id: string): Promise<number> {
+      const response = await request.get(`${apiUrl}/books/${id}/file`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.status();
+    },
     async deleteBook(token: string, id: string): Promise<void> {
       const response = await request.delete(`${apiUrl}/books/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
