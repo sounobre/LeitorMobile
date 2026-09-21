@@ -86,10 +86,12 @@ function lexiconDefinition(entry: LexiconEntry | null) {
 export default function EpubReader({
   book,
   onClose,
+  onProgressUpdated,
   onCardCreated,
 }: {
   book: Book;
   onClose: () => void;
+  onProgressUpdated?: (book: Book) => void;
   onCardCreated?: (card: Card) => void;
 }) {
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -136,7 +138,7 @@ export default function EpubReader({
             : progress / 100;
           const nextProgress = Math.max(0, Math.min(100, Math.round(percentage * 100)));
           setProgress(nextProgress);
-          void updateBookProgress(book.id, cfi, nextProgress / 100).catch(() => undefined);
+          void updateBookProgress(book.id, cfi, nextProgress / 100).then((updatedBook) => onProgressUpdated?.(updatedBook)).catch(() => undefined);
         });
         rendition.on('selected', (cfiRange: string, contents: EpubContents) => {
           const text = contents.window?.getSelection()?.toString().trim() ?? '';

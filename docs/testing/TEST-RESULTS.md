@@ -635,3 +635,46 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Regressão da fundação após as alterações: TEST-001 total `3`, pass `3`, failures `0`, skipped `0`, exit code `0`; TEST-013 total `2`, pass `2`, failures `0`, skipped `0`, exit code `0`; TEST-020 total `1`, pass `1`, failures `0`, skipped `0`, exit code `0`.
 - TEST IDs alterados: somente `TEST-023`; `TEST-009`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados. `TEST-001`, `TEST-013` e `TEST-020` foram apenas revalidados.
 - Classificações: restauração na mesma sessão = `PRODUCT_BUG_CANDIDATE`; diferença de status no missing-file = divergência de contrato/runtime observada, sem mudança de expectation ou produção; nenhuma mudança de produção foi feita.
+
+## TEST-023 confirmed bug — TDD fix
+
+- Status: `PASS` após correção; a detecção histórica `TEST-023 = FAIL` e o `PRODUCT_BUG_CANDIDATE` permanecem registrados na Wave 3D acima.
+- Base utilizada: `origin/main` / `97954efab22f41732a05fe0890478c68ff17f9a7`; branch/worktree: `fix/web-reader-progress-state` / `C:\Users\souno\.codex\worktrees\fix-web-reader-progress-state\LeitorMobile`.
+- Data/hora UTC do registro: `2026-09-21T19:35:32Z`.
+- Database/schema/usuário: `leitor_test` / `public` / `leitor_test_user`; nenhum backend, migration, SecurityConfig ou AuthFilter foi alterado.
+
+### Root cause
+
+- `updateBookProgress` já retornava o Book atualizado pelo backend, mas `EpubReader` descartava esse retorno.
+- `App.books` mantinha o Book stale; ao fechar e reabrir sem reload, `readingBook` recebia o Book antigo sem `lastCfi`, e o reader iniciava no capítulo 1.
+- O RED foi revalidado antes do patch: capítulo 1 → capítulo 2 → PATCH `200`/CFI persistido → reabertura same-session no capítulo 1.
+
+### Production change
+
+- Arquivos: `frontend/src/App.tsx` e `frontend/src/EpubReader.tsx`.
+- `EpubReader` agora expõe `onProgressUpdated` e encaminha o Book retornado por `updateBookProgress`, mantendo o `.catch(() => undefined)` tolerante.
+- `App` substitui somente o Book com o mesmo ID em `books` e em `readingBook`.
+- O efeito de abertura continua dependente de `book.id`; o reader não é remontado a cada PATCH. Não houve `listBooks()` adicional, reload, localStorage de CFI ou PATCH duplicado.
+
+### GREEN
+
+- Cenário principal TEST-023: capítulo 1 → `Próxima` → capítulo 2 → CFI mudou/persistiu → fechar → reabrir sem reload → capítulo 2 restaurado.
+- TEST-023 completo: total `3`, pass `3`, failures `0`, errors `0`, skipped `0`, exit code `0`; a execução final durou `33.4s`.
+- O cenário diagnóstico com reload permaneceu verde como evidência complementar; não foi usado para satisfazer o acceptance path.
+- Missing-file permaneceu somente caracterização: runtime `GET /api/books/{id}/file = 401`, UI de erro e retorno à biblioteca passaram.
+
+### Regression
+
+- Frontend build: `npm run build`, exit code `0`.
+- Static tests: `node --test book-upload.test.mjs card-creation.test.mjs lexicon-entry-contract.test.mjs lexicon-lookup.test.mjs lexicon-start.test.mjs`; total `5`, pass `5`, failures `0`, skipped `0`, exit code `0`.
+- TEST-001: total `3`, pass `3`, failures `0`, skipped `0`, exit code `0`.
+- TEST-013: total `2`, pass `2`, failures `0`, skipped `0`, exit code `0`.
+- TEST-020: total `1`, pass `1`, failures `0`, skipped `0`, exit code `0`.
+- TEST-023: total `3`, pass `3`, failures `0`, skipped `0`, exit code `0`.
+
+### Final state
+
+- `PRODUCT_BUG reader progress state: CONFIRMED → FIXED`.
+- `TEST-023`: historical detection `FAIL`; final status after fix `PASS`.
+- `FOLLOW_UP_REQUIRED`: missing-file HTTP `401` em runtime E2E versus `404` no outro boundary/caminho documentado. Não investigado nem alterado nesta branch.
+- TEST IDs alterados: somente `TEST-023`; `TEST-009`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados.
