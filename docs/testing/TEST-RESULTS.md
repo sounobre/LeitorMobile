@@ -907,3 +907,63 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `PRODUCT_BUG_CANDIDATE`: `YES` — missing lexical lookup returns successful HTTP 200 with an empty body, while the production client requires JSON and surfaces a parsing error instead of the intended empty-result message.
 - `TEST_INFRASTRUCTURE`: no remaining selection-harness issue; the real iframe selection and epub.js toolbar path were exercised.
 - Recommendation: `DO NOT MERGE — bug fix required`.
+
+## TEST-027 confirmed bug — nullable API response TDD fix
+
+- Base: branch `fix/web-nullable-api-response` created from RED commit `24984dcbf58dbb449d63693e257f6c1ab7998179`.
+
+### Root cause
+
+- The generic frontend `request<T>()` called `response.json()` for every successful non-204 response.
+- `LexiconService.lookup(...)` and `LexiconService.status(...)` return `null` when no entry/job exists; Spring exposed that runtime contract as HTTP `200` with an empty body.
+- The empty lookup body therefore raised `Unexpected end of JSON input` before EpubReader could handle `!entry`.
+
+### TDD RED
+
+- TEST-027 before the fix: `FAIL`.
+- Found lookup: HTTP `200`, lemma `dragon`, translation `dragão`, UI `dragon: dragão`.
+- Missing lookup: HTTP `200`, empty body for `silver moonspire`.
+- UI result: `Unexpected end of JSON input` instead of the intended empty-result message.
+- The nullable static contract also failed because `requestNullable` did not exist.
+
+### Production change
+
+- File changed: `frontend/src/api.ts` only.
+- Added shared `requestResponse(...)` for headers, auth-session cleanup on `401`, and HTTP error handling.
+- Kept generic `request<T>()` strict: `204` remains `undefined`; other successful responses still require JSON.
+- Added `requestNullable<T>()`: successful empty body becomes `null`; JSON body becomes `T`; HTTP errors preserve the existing error behavior.
+- `lookupBookLexicon(...)` now uses `requestNullable<LexiconEntry>(...)`.
+- `getBookLexiconJob(...)` now uses `requestNullable<LexiconJob>(...)`.
+- No changes to EpubReader, Card code, backend, database, migrations, or security configuration.
+
+### GREEN
+
+- TEST-027: `PASS`; total `1`, pass `1`, failures `0`, skipped `0`, isolated duration `30.5s`.
+- Found result: lookup `200`; UI `dragon: dragão`.
+- Missing result: lookup `200` with empty body; frontend value `null`.
+- UI result: `No definition is prepared for this selection yet.`; prior `dragão` content did not leak.
+- `Unexpected end of JSON input`: absent.
+- TEST-028: `PASS`; POST `/api/cards = 201`, card persisted, front `dragon`, back `dragão` plus definition.
+
+### No-job nullable contract
+
+- A newly uploaded Book with no lexical job returned the observed nullable runtime contract through `GET /api/books/{id}/lexicon/jobs/latest`: HTTP `200`, empty body; the fixture parser resolved `null` before the job was started.
+- The frontend static contract verifies that `getBookLexiconJob` is wired to `requestNullable<LexiconJob>`.
+
+### Verification
+
+- Combined TEST-027 + TEST-028: `2/2 PASS`.
+- Build: `npm run build` passed.
+- Static contracts: `6/6 PASS`, including `nullable-api-response.test.mjs`.
+- TEST-001: `3/3 PASS`.
+- TEST-009: `1/1 PASS`.
+- TEST-013: `2/2 PASS`.
+- TEST-020: `1/1 PASS`.
+- TEST-023: `3/3 PASS`.
+- TEST-029 and TEST-039 were not executed.
+
+### Verdict
+
+- `PRODUCT_BUG nullable API response`: `CONFIRMED → FIXED`.
+- TEST-027 historical detection: `FAIL`; final status: `PASS`.
+- TEST-028: `PASS`.
