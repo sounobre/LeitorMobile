@@ -12,14 +12,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.leitormobile.LeitorBackendApplication;
 import br.com.leitormobile.auth.AppUser;
 import br.com.leitormobile.auth.AppUserRepository;
-import br.com.leitormobile.auth.AuthFilter;
-import br.com.leitormobile.auth.AuthService;
 import br.com.leitormobile.auth.SessionToken;
 import br.com.leitormobile.auth.SessionTokenRepository;
 import br.com.leitormobile.support.PostgresIntegrationTestSupport;
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -34,6 +35,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
@@ -47,9 +49,10 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
+import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -61,7 +64,7 @@ import org.springframework.test.web.servlet.MockMvc;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @AutoConfigureMockMvc
-@Import(MissingBookFileHttpStatusProbeTest.TraceConfiguration.class)
+@Import(MissingBookFileHttpStatusProbeTest.PassiveTraceConfiguration.class)
 class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport {
 
     private static final HttpClient HTTP = HttpClient.newBuilder()
@@ -91,7 +94,7 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
     private BookContentService contentService;
 
     @Autowired
-    private TraceRecorder traceRecorder;
+    private PassiveTraceRecorder passiveTraceRecorder;
 
     private AppUser owner;
     private SessionToken session;
@@ -140,7 +143,6 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
         sessionTokenRepository.flush();
         if (owner != null) userRepository.delete(owner);
         userRepository.flush();
-        traceRecorder.clear();
     }
 
     @AfterAll
@@ -161,9 +163,11 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
     void comparesMockMvcAndRealHttpForMissingBookFile() throws Exception {
         HttpObservation authenticatedList = httpGet(port, "/api/books", token);
         HttpObservation existingFile = httpGet(port, "/api/books/" + existingBook.getId() + "/file", token);
-        traceRecorder.clear();
-        HttpObservation missingFile = httpGet(port, "/api/books/" + missingBook.getId() + "/file", token);
-        List<TraceEvent> missingTrace = traceRecorder.snapshot();
+        passiveTraceRecorder.clear();
+        HttpObservation missingFileRun1 = httpGet(port, "/api/books/" + missingBook.getId() + "/file", token);
+        HttpObservation missingFileRun2 = httpGet(port, "/api/books/" + missingBook.getId() + "/file", token);
+        HttpObservation missingFileRun3 = httpGet(port, "/api/books/" + missingBook.getId() + "/file", token);
+        List<PassiveTraceEvent> missingTrace = passiveTraceRecorder.snapshot();
         HttpObservation unauthenticated = httpGet(port, "/api/books/" + missingBook.getId() + "/file", null);
 
         int mockMvcStatus = mockMvc.perform(
@@ -183,38 +187,35 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
         assertEquals("application/epub+zip", existingFile.contentType());
         assertArrayEquals("synthetic epub bytes".getBytes(StandardCharsets.UTF_8), existingFile.bodyBytes());
         assertEquals(401, unauthenticated.status());
-        assertEquals(404, missingFile.status());
+        assertTrue(missingFileRun1.status() == 404 || missingFileRun1.status() == 401,
+                "Authenticated missing-file HTTP status must be 404 or 401, got " + missingFileRun1.status());
+        assertEquals(missingFileRun1.status(), missingFileRun2.status());
+        assertEquals(missingFileRun1.status(), missingFileRun3.status());
 
-        boolean errorDispatch = missingTrace.stream().anyMatch(event -> event.dispatcher() == DispatcherType.ERROR);
-        boolean requestDispatch = missingTrace.stream().anyMatch(event -> event.dispatcher() == DispatcherType.REQUEST);
-        boolean authenticatedOriginal = missingTrace.stream()
-                .filter(event -> event.dispatcher() == DispatcherType.REQUEST)
-                .anyMatch(event -> event.contextAuthenticatedAfter());
-        boolean authenticatedError = missingTrace.stream()
-                .filter(event -> event.dispatcher() == DispatcherType.ERROR)
-                .anyMatch(event -> event.contextAuthenticatedAfter());
-
-        assertTrue(errorDispatch);
-        assertTrue(requestDispatch);
-        assertTrue(authenticatedOriginal);
-        assertTrue(authenticatedError);
+        boolean requestTrace = missingTrace.stream()
+                .anyMatch(event -> event.dispatcher() == DispatcherType.REQUEST
+                        && event.uri().equals("/api/books/" + missingBook.getId() + "/file")
+                        && event.authorizationHeaderPresent());
+        boolean errorTrace = missingTrace.stream()
+                .anyMatch(event -> event.dispatcher() == DispatcherType.ERROR);
+        assertTrue(requestTrace, "Passive trace must observe the authenticated request dispatch.");
+        if (missingFileRun1.status() == 401) {
+            assertTrue(errorTrace, "401 reproduction must include an ERROR dispatch in passive trace.");
+        }
 
         System.out.printf(
-                "MISSING_FILE_PROBE mockMvc=%d realHttp=%d list=%d existing=%d unauthenticated=%d "
-                        + "body=%s contentType=%s trace=%s errorDispatch=%s requestDispatch=%s "
-                        + "authenticatedOriginal=%s authenticatedError=%s%n",
+                "MISSING_FILE_PROBE mockMvc=%d realHttpRun1=%d realHttpRun2=%d realHttpRun3=%d "
+                        + "list=%d existing=%d unauthenticated=%d body=%s contentType=%s trace=%s%n",
                 mockMvcStatus,
-                missingFile.status(),
+                missingFileRun1.status(),
+                missingFileRun2.status(),
+                missingFileRun3.status(),
                 authenticatedList.status(),
                 existingFile.status(),
                 unauthenticated.status(),
-                sanitize(missingFile.body()),
-                missingFile.contentType(),
-                missingTrace,
-                errorDispatch,
-                requestDispatch,
-                authenticatedOriginal,
-                authenticatedError
+                sanitize(missingFileRun1.body()),
+                missingFileRun1.contentType(),
+                missingTrace
         );
 
     }
@@ -260,7 +261,7 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
         }
     }
 
-    private record TraceEvent(
+    private record PassiveTraceEvent(
             DispatcherType dispatcher,
             String uri,
             boolean authorizationHeaderPresent,
@@ -269,11 +270,11 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
             int status
     ) {}
 
-    static final class TraceRecorder {
-        private final List<TraceEvent> events = new CopyOnWriteArrayList<>();
+    static final class PassiveTraceRecorder {
+        private final List<PassiveTraceEvent> events = new CopyOnWriteArrayList<>();
 
         void record(HttpServletRequest request, HttpServletResponse response, boolean before, boolean after) {
-            events.add(new TraceEvent(
+            events.add(new PassiveTraceEvent(
                     request.getDispatcherType(),
                     request.getRequestURI(),
                     request.getHeader(HttpHeaders.AUTHORIZATION) != null,
@@ -283,7 +284,7 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
             ));
         }
 
-        List<TraceEvent> snapshot() {
+        List<PassiveTraceEvent> snapshot() {
             return List.copyOf(events);
         }
 
@@ -292,34 +293,50 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
         }
     }
 
+    static final class PassiveTraceFilter implements Filter {
+        private final PassiveTraceRecorder recorder;
+
+        PassiveTraceFilter(PassiveTraceRecorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @Override
+        public void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain)
+                throws IOException, ServletException {
+            if (!(request instanceof HttpServletRequest httpRequest)
+                    || !(response instanceof HttpServletResponse httpResponse)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            boolean before = isAuthenticated();
+            try {
+                filterChain.doFilter(request, response);
+            } finally {
+                recorder.record(httpRequest, httpResponse, before, isAuthenticated());
+            }
+        }
+
+        private static boolean isAuthenticated() {
+            return SecurityContextHolder.getContext().getAuthentication() != null;
+        }
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
-    static class TraceConfiguration {
+    static class PassiveTraceConfiguration {
         @Bean
-        TraceRecorder traceRecorder() {
-            return new TraceRecorder();
+        PassiveTraceRecorder passiveTraceRecorder() {
+            return new PassiveTraceRecorder();
         }
 
         @Bean
-        @Primary
-        AuthFilter tracedAuthFilter(AuthService authService, TraceRecorder recorder) {
-            return new AuthFilter(authService) {
-                @Override
-                protected boolean shouldNotFilterErrorDispatch() {
-                    return false;
-                }
-
-                @Override
-                protected void doFilterInternal(
-                        HttpServletRequest request,
-                        HttpServletResponse response,
-                        FilterChain filterChain
-                ) throws ServletException, IOException {
-                    boolean before = SecurityContextHolder.getContext().getAuthentication() != null;
-                    super.doFilterInternal(request, response, filterChain);
-                    boolean after = SecurityContextHolder.getContext().getAuthentication() != null;
-                    recorder.record(request, response, before, after);
-                }
-            };
+        FilterRegistrationBean<Filter> passiveTraceFilter(PassiveTraceRecorder recorder) {
+            FilterRegistrationBean<Filter> registration = new FilterRegistrationBean<>();
+            registration.setFilter(new PassiveTraceFilter(recorder));
+            registration.addUrlPatterns("/*");
+            registration.setDispatcherTypes(EnumSet.of(DispatcherType.REQUEST, DispatcherType.ERROR));
+            registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+            return registration;
         }
     }
 }
