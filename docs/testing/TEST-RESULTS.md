@@ -717,3 +717,50 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Contrato relacionado: `mvn -q -Dtest=BookControllerApiTest#downloadIsOwnerScopedAndRequiresAnAccessibleManagedFile test`; total `1`, pass `1`, failures `0`, errors `0`, skipped `0`, exit code `0`; MockMvc manteve `404` para o Book próprio sem EPUB.
 - TEST-023 permanece `PASS` após o fix de restauração; nenhum outro TEST ID foi executado.
 - Arquivos alterados nesta investigação: `MissingBookFileHttpStatusProbeTest.java` e este ledger; nenhum arquivo de produção foi alterado.
+
+## Follow-up correction — missing book file HTTP status
+
+- Classification: corrected diagnostic follow-up; no new TEST ID was created or altered.
+- Base: `origin/main` / `122d88a7ec51addd43d90619a2828ca6cd091678`.
+- Branch/worktree: `probe/missing-book-file-http-status-v2` / `C:\Users\souno\.codex\worktrees\probe-missing-book-file-http-status-v2\LeitorMobile`.
+- Database/schema: `leitor_test` / `public`; owner, session/token and storage were synthetic and isolated.
+
+### Previous probe limitation
+
+- `AuthFilter` production was replaced by a test `@Primary` subclass.
+- `shouldNotFilterErrorDispatch()` was forced to `false`.
+- The test called `super.doFilterInternal(...)` during `ERROR` dispatch, which could reauthenticate `/error` and mask the production divergence.
+- The previous result is therefore reclassified as `INCONCLUSIVE — TEST HARNESS ALTERED AUTH BEHAVIOR`.
+
+### Corrected production-equivalent controls
+
+- A — authenticated `GET /api/books`: `200`.
+- B — authenticated `GET /api/books/{id}/file` with EPUB: `200`, `Content-Type: application/epub+zip`.
+- C — authenticated own Book without EPUB: run1 `401`, run2 `401`, run3 `401`.
+- D — unauthenticated missing-file request: `401`.
+- MockMvc authenticated own Book without EPUB: `404` (comparison only).
+- Real HTTP decisive result: `401`, repeated consistently across all three C runs.
+
+### Passive tracing
+
+- Used: yes, only after clean C reproduced `401`; a test-only `FilterRegistrationBean` recorded dispatcher, URI, bearer-present boolean, SecurityContext before/after, and response status, then always called `filterChain.doFilter`.
+- No `AuthFilter` replacement, `@Primary`, `AuthService` call, SecurityContext write, Authorization-header mutation, response-status mutation, or production dispatcher change was introduced.
+- REQUEST: bearer present; the production controller and `BookContentService.open` were called; the request-stage response was `404`.
+- ERROR: `/error` involved; bearer present; passive outer-filter context unauthenticated before/after; final response `401`.
+- Production AuthFilter ERROR behavior: skipped by the inherited `OncePerRequestFilter` default; v2 did not modify it.
+- First divergence: the controller/service path emits `404`, then the `/error` dispatch is handled without an authenticated context and the final HTTP status becomes `401`.
+
+### Verdict
+
+- Verdict: `CONFIRMED`.
+- `PRODUCT_BUG_CANDIDATE`: `YES`.
+- TEST-023 continues `PASS` independently; no Playwright recheck was executed because the required follow-up rule permits it only when C is consistently `404`.
+- Production files changed: `NONE`; `AuthFilter`, `SecurityConfig`, `BookController` and `BookContentService` remain unchanged.
+- TEST IDs altered: `NONE`.
+
+### Regression
+
+- Corrected probe: `mvn -q -Dtest=MissingBookFileHttpStatusProbeTest test`; total `1`, pass `1`, failures `0`, errors `0`, skipped `0`, exit code `0`.
+- Related `BookControllerApiTest`: `mvn -q -Dtest=BookControllerApiTest test`; total `13`, pass `13`, failures `0`, errors `0`, skipped `0`, exit code `0`.
+- Backend full regression: `mvn -q test`; total `64`, pass `64`, failures `0`, errors `0`, skipped `0`, exit code `0`; `24` Surefire reports.
+- Playwright recheck: not executed because C was `401`, per the requested conditional workflow; TEST-023 expectation and production code were not changed.
