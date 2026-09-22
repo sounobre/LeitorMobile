@@ -62,6 +62,7 @@ async function prepareLexicalBook(api: ReturnType<typeof createApiClient>, token
     });
     expect(book.fileAvailable).toBe(true);
     expect(await api.getBookFileStatus(token, book.id)).toBe(200);
+    expect(await api.getLexiconJob(token, book.id)).toBeNull();
     await api.startLexiconJob(token, book.id);
 
     let latestJob = null as Awaited<ReturnType<typeof api.getLexiconJob>>;

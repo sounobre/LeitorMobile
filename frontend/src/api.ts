@@ -42,7 +42,7 @@ export function logout() {
   clearSession();
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function requestResponse(path: string, options?: RequestInit): Promise<Response> {
   const headers = new Headers(options?.headers);
   headers.set('Content-Type', 'application/json');
   if (authToken) headers.set('Authorization', 'Bearer ' + authToken);
@@ -53,8 +53,20 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const body = await response.text();
     throw new Error(body || ('Falha na comunicação com o servidor (' + response.status + ').'));
   }
+  return response;
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await requestResponse(path, options);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+async function requestNullable<T>(path: string, options?: RequestInit): Promise<T | null> {
+  const response = await requestResponse(path, options);
+  const body = await response.text();
+  if (!body.trim()) return null;
+  return JSON.parse(body) as T;
 }
 
 async function requestBinary(path: string): Promise<ArrayBuffer> {
@@ -187,9 +199,9 @@ export function startBookLexicon(bookId: string, force = false): Promise<Lexicon
 }
 
 export function getBookLexiconJob(bookId: string): Promise<LexiconJob | null> {
-  return request<LexiconJob | null>('/books/' + bookId + '/lexicon/jobs/latest');
+  return requestNullable<LexiconJob>('/books/' + bookId + '/lexicon/jobs/latest');
 }
 
 export function lookupBookLexicon(bookId: string, term: string): Promise<LexiconEntry | null> {
-  return request<LexiconEntry | null>('/books/' + bookId + '/lexicon/lookup?term=' + encodeURIComponent(term));
+  return requestNullable<LexiconEntry>('/books/' + bookId + '/lexicon/lookup?term=' + encodeURIComponent(term));
 }
