@@ -967,3 +967,32 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `PRODUCT_BUG nullable API response`: `CONFIRMED → FIXED`.
 - TEST-027 historical detection: `FAIL`; final status: `PASS`.
 - TEST-028: `PASS`.
+
+## Wave 3G — Web lexical modal component
+
+### TEST-029
+
+- Status: `PASS`.
+- Level: `COMPONENT`; Purpose `CONTRACT`; Priority `P1`; Surface `WEB`.
+- Base: `origin/main` at `02628dd3acba2c7bed7ebf8ffd7c5665b2e52b63`; branch `test/wave-3g-lexicon-modal-component`.
+- Harness: Vite-only page plus Playwright Chromium component driver; `BookProcessingDetailsModal` was rendered directly with controlled props. `App` was not rendered.
+- Backend used: `NO`; database used: `NO`; API network calls: `NONE` — the spec recorded zero `/api/` requests.
+- Synthetic job: fixed `COMPLETED` job; synthetic book title `TEST-029 Lexical Modal`.
+- Sense fixture: lemma `dragon`; top-level `translationPtBr=''` and `definition=''`; `senses[0].translationPtBr='tradução por sentido'`; `senses[0].definition='definition from sense'`; `bookFrequency=7`; part of speech `noun`; IPA `/ˈdræɡən/`; CEFR `A2`; status `RESOLVED_LOCAL`; one sense.
+- Sense fixture result: the real component interaction `input → Consultar → local onLookup Promise → render` showed `dragon`, `noun · 7 ocorrências`, `definition from sense`, `tradução por sentido`, `/ˈdræɡən/`, `A2`, `RESOLVED_LOCAL`, and `1 sentido(s) catalogado(s)`.
+- Optional-fields fixture: lemma `mystery`, `partOfSpeech=null`, `senses=[]`, and optional lexical fields absent. Observed current behavior: `Classe não informada`, `0 ocorrências`, `Sem definição disponível.`, `Sem tradução disponível.`, `—` for IPA/CEFR, `UNRESOLVED`, and `0 sentido(s) catalogado(s)`.
+- Null lookup: not covered; the modal-specific TEST-029 scope used the found-entry and optional-fields fixtures. Error lookup: not covered.
+- Static contract: `lexicon-entry-contract.test.mjs` remains green and verifies `senses[0]?.translationPtBr`, `bookFrequency`, and the absence of `senses[0]?.translation` and `currentEntry?.frequency`.
+- Focused component command: `npx --no-install playwright test --config=component-tests/playwright.config.ts component-tests/lexicon-modal.spec.ts --grep TEST-029`; Chromium, total `2`, pass `2`, failures `0`, skipped `0`, exit code `0`, final duration `4.4s`.
+- Baseline/final build: `npm run build` exit code `0`.
+- Static tests: six tests, six pass, zero failures, zero skipped, exit code `0`.
+- Lexical E2E regressions: TEST-027 total `1`, pass `1`, failures `0`, skipped `0`, exit code `0`, duration `42.4s`; TEST-028 total `1`, pass `1`, failures `0`, skipped `0`, exit code `0`, duration `36.5s`.
+- TEST-027 network evidence remained found lookup `200`, missing lookup `200` with empty body, and the expected no-result handling; TEST-028 retained real card creation `201` and owner-scoped card listing `200`.
+- Production files changed: `NONE`.
+- TEST IDs altered: `TEST-029` only. TEST-027 and TEST-028 were reexecuted only as related regression; TEST-039 was not executed.
+
+### Verdict
+
+- `PRODUCT_BUG_CANDIDATE`: none.
+- `TEST_INFRASTRUCTURE`: none; the component was isolated from `App`, backend, database, and external network.
+- Recommendation: `MERGE SAFE`.
