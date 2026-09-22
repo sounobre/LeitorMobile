@@ -169,6 +169,7 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
         HttpObservation missingFileRun3 = httpGet(port, "/api/books/" + missingBook.getId() + "/file", token);
         List<PassiveTraceEvent> missingTrace = passiveTraceRecorder.snapshot();
         HttpObservation unauthenticated = httpGet(port, "/api/books/" + missingBook.getId() + "/file", null);
+        HttpObservation directErrorRequest = httpGet(port, "/error", null);
 
         int mockMvcStatus = mockMvc.perform(
                         get("/api/books/{id}/file", missingBook.getId())
@@ -187,25 +188,26 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
         assertEquals("application/epub+zip", existingFile.contentType());
         assertArrayEquals("synthetic epub bytes".getBytes(StandardCharsets.UTF_8), existingFile.bodyBytes());
         assertEquals(401, unauthenticated.status());
-        assertTrue(missingFileRun1.status() == 404 || missingFileRun1.status() == 401,
-                "Authenticated missing-file HTTP status must be 404 or 401, got " + missingFileRun1.status());
-        assertEquals(missingFileRun1.status(), missingFileRun2.status());
-        assertEquals(missingFileRun1.status(), missingFileRun3.status());
+        assertEquals(401, directErrorRequest.status());
+        assertEquals(404, missingFileRun1.status());
+        assertEquals(404, missingFileRun2.status());
+        assertEquals(404, missingFileRun3.status());
 
         boolean requestTrace = missingTrace.stream()
                 .anyMatch(event -> event.dispatcher() == DispatcherType.REQUEST
                         && event.uri().equals("/api/books/" + missingBook.getId() + "/file")
                         && event.authorizationHeaderPresent());
         boolean errorTrace = missingTrace.stream()
-                .anyMatch(event -> event.dispatcher() == DispatcherType.ERROR);
+                .anyMatch(event -> event.dispatcher() == DispatcherType.ERROR
+                        && event.uri().equals("/error")
+                        && event.status() == 404);
         assertTrue(requestTrace, "Passive trace must observe the authenticated request dispatch.");
-        if (missingFileRun1.status() == 401) {
-            assertTrue(errorTrace, "401 reproduction must include an ERROR dispatch in passive trace.");
-        }
+        assertTrue(errorTrace, "Passive trace must observe the 404 ERROR dispatch.");
 
         System.out.printf(
                 "MISSING_FILE_PROBE mockMvc=%d realHttpRun1=%d realHttpRun2=%d realHttpRun3=%d "
-                        + "list=%d existing=%d unauthenticated=%d body=%s contentType=%s trace=%s%n",
+                        + "list=%d existing=%d unauthenticated=%d directError=%d "
+                        + "body=%s contentType=%s trace=%s%n",
                 mockMvcStatus,
                 missingFileRun1.status(),
                 missingFileRun2.status(),
@@ -213,6 +215,7 @@ class MissingBookFileHttpStatusProbeTest extends PostgresIntegrationTestSupport 
                 authenticatedList.status(),
                 existingFile.status(),
                 unauthenticated.status(),
+                directErrorRequest.status(),
                 sanitize(missingFileRun1.body()),
                 missingFileRun1.contentType(),
                 missingTrace

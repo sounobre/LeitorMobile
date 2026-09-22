@@ -764,3 +764,73 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Related `BookControllerApiTest`: `mvn -q -Dtest=BookControllerApiTest test`; total `13`, pass `13`, failures `0`, errors `0`, skipped `0`, exit code `0`.
 - Backend full regression: `mvn -q test`; total `64`, pass `64`, failures `0`, errors `0`, skipped `0`, exit code `0`; `24` Surefire reports.
 - Playwright recheck: not executed because C was `401`, per the requested conditional workflow; TEST-023 expectation and production code were not changed.
+
+## Missing-file HTTP status — confirmed bug TDD fix
+
+- Base: `origin/main` / `3edab74e2ac3e90520cfbe49119affc2fe9c4fe1`.
+- Branch/worktree: `fix/http-error-dispatch-security` / `C:\Users\souno\.codex\worktrees\fix-http-error-dispatch-security\LeitorMobile`.
+- Database/schema/user: `leitor_test` / `public` / `leitor_test_user`.
+
+### Root cause
+
+- Internal `ERROR` dispatch for `/error` passed through authorization again without the original `SecurityContext`.
+- The production `AuthFilter` correctly skipped ERROR dispatch by the inherited `OncePerRequestFilter` default.
+- `anyRequest().authenticated()` therefore converted the original authenticated request's `404` into final `401`.
+
+### TDD RED
+
+- Authenticated missing EPUB over real HTTP: `401` (all three runs before the production change).
+- Final HTTP: `401`.
+- Direct normal REQUEST to `/error` without Bearer: `401`.
+- Unauthenticated protected file request: `401`.
+
+### Production change
+
+- File: `backend/src/main/java/br/com/leitormobile/auth/SecurityConfig.java`.
+- Added only `dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()` before the existing request matchers.
+- This permits the internal ERROR dispatcher type, not `requestMatchers("/error").permitAll()`.
+- `AuthFilter`: unchanged.
+- `BookContentService`: unchanged.
+- No exception handler, URL-wide /error exemption, OPTIONS policy, login policy, actuator policy, or other authorization rule was changed.
+
+### TDD GREEN
+
+- Authenticated `GET /api/books`: `200`.
+- Authenticated existing EPUB: `200`.
+- Authenticated missing EPUB: run1 `404`, run2 `404`, run3 `404`.
+- Unauthenticated protected endpoint: `401`.
+- Direct normal REQUEST `GET /error` without Bearer: `401`.
+- MockMvc missing EPUB: `404`.
+
+### Error dispatch trace
+
+- REQUEST authenticated: yes; Bearer present; controller and service reached.
+- Service status: `ResponseStatusException(404)`.
+- ERROR dispatch: `/error` occurred with the Bearer still present.
+- AuthFilter rerun: no; it remains skipped for ERROR by production default.
+- ERROR authorization: permitted by dispatcher type only.
+- Final status: `404`.
+
+### Playwright
+
+- TEST-023 complete: `3/3 PASS`.
+- Missing-file HTTP: direct `404`, browser `404`, authorization header present.
+- UI error: PASS — “Não foi possível abrir o livro.”
+- Return to library: PASS.
+- TEST-023 remains PASS; TEST-001, TEST-013 and TEST-020 were not executed because this request prohibits other TEST IDs.
+
+### Regression and security guards
+
+- `mvn -q -Dtest=MissingBookFileHttpStatusProbeTest test`: `1/1` PASS.
+- `mvn -q -Dtest=BookControllerApiTest test`: `13/13` PASS.
+- `mvn -q test`: total `64`, pass `64`, failures `0`, errors `0`, skipped `0`; `24` Surefire reports.
+- Database: `leitor_test`, schema `public`, user `leitor_test_user`.
+- Anonymous protected resource: `401`.
+- Direct `/error` REQUEST: `401`.
+- `/actuator/health`: public and healthy; contract suite passed.
+- `/api/auth/login`: policy unchanged; invalid/unknown credentials remain `401` without session creation.
+
+### Verdict
+
+- PRODUCT_BUG HTTP error dispatch: `CONFIRMED → FIXED`.
+- No new TEST ID was created or altered.
