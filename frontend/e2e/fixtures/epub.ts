@@ -147,3 +147,32 @@ export async function createSyntheticReaderEpub(prefix = 'wave-3d-test-023-'): P
     cleanup: async () => fs.rm(temporaryDirectory, { recursive: true, force: true }),
   };
 }
+
+export async function createSyntheticLexicalEpub(prefix = 'wave-3f-test-'): Promise<SyntheticEpub> {
+  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
+  const filePath = path.join(temporaryDirectory, prefix + 'synthetic-lexical.epub');
+  const entries: ZipEntry[] = [
+    { name: 'mimetype', data: Buffer.from('application/epub+zip', 'utf8') },
+    {
+      name: 'META-INF/container.xml',
+      data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>', 'utf8'),
+    },
+    {
+      name: 'OEBPS/content.opf',
+      data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="pub-id">urn:uuid:wave-3f-test-027</dc:identifier><dc:title>Wave 3F Synthetic Lexical Reader</dc:title><dc:language>en</dc:language></metadata><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>', 'utf8'),
+    },
+    {
+      name: 'OEBPS/chapter.xhtml',
+      data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Wave 3F Lexical Chapter</title></head><body><h1>Wave 3F Lexical Chapter</h1><p>The dragon crossed the silver moonspire.</p><p>The dragon can read a book.</p></body></html>', 'utf8'),
+    },
+  ];
+  const bytes = buildStoredZip(entries);
+  await fs.writeFile(filePath, bytes);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  return {
+    path: filePath,
+    size: bytes.length,
+    sha256,
+    cleanup: async () => fs.rm(temporaryDirectory, { recursive: true, force: true }),
+  };
+}

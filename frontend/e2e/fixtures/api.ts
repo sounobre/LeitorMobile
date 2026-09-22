@@ -34,6 +34,23 @@ export type UploadBookContentInput = {
   cover?: { name: string; mimeType: string; buffer: Buffer };
 };
 
+export type ApiCard = {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  cfiRange: string;
+  selectedText: string;
+  translation: string;
+  pronunciation: string;
+  partOfSpeech: string;
+  definition: string;
+  background: string;
+  examples: string[];
+  relatedWords: string[];
+  chapterTitle: string;
+  queueOrder: number;
+  archived: boolean;
+};
 export type ApiLexiconJob = {
   id: string;
   bookId: string;
@@ -67,6 +84,7 @@ export function createApiClient(request: APIRequestContext) {
   async function readJson<T>(response: { ok(): boolean; status(): number; text(): Promise<string> }): Promise<T> {
     const body = await response.text();
     if (!response.ok()) throw new Error(`API request failed with status ${response.status()}: ${body}`);
+    if (!body.trim()) return null as T;
     return JSON.parse(body) as T;
   }
 
@@ -96,6 +114,11 @@ export function createApiClient(request: APIRequestContext) {
       }));
     },
 
+    async startLexiconJob(token: string, bookId: string, force = false): Promise<ApiLexiconJob> {
+      return readJson<ApiLexiconJob>(await request.post(`${apiUrl}/books/${bookId}/lexicon/jobs${force ? '?force=true' : ''}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }));
+    },
     async lookupBookLexicon(token: string, bookId: string, term: string): Promise<{ status: number; body: ApiLexiconEntry | null }> {
       const response = await request.get(`${apiUrl}/books/${bookId}/lexicon/lookup?term=${encodeURIComponent(term)}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -110,6 +133,11 @@ export function createApiClient(request: APIRequestContext) {
       }));
     },
 
+    async listCards(token: string, includeArchived = false): Promise<ApiCard[]> {
+      return readJson<ApiCard[]>(await request.get(`${apiUrl}/cards?includeArchived=${includeArchived}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }));
+    },
     async getBookFileStatus(token: string, id: string): Promise<number> {
       const response = await request.get(`${apiUrl}/books/${id}/file`, {
         headers: { Authorization: `Bearer ${token}` },

@@ -858,3 +858,52 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Cleanup: only `wave-3e-test-009-` fixture books were deleted through the normal API cleanup flow; no storage-wide deletion was used.
 - Production files changed: `NONE`.
 - TEST IDs altered: `TEST-009` only; TEST-001, TEST-013, TEST-020 and TEST-023 remain PASS.
+
+## Wave 3F — Web lexical selection and card creation
+
+### TEST-027
+
+- Status: `FAIL` — `PRODUCT_BUG_CANDIDATE` confirmed in the production UI path; the harness remained production-equivalent.
+- Base: `origin/main` / `931ad5e1f405ecec3ea742104e1878aad3d6ece6`.
+- Fixture: isolated `wave-3f-test-027-` book with deterministic EPUB containing `The dragon crossed the silver moonspire.`; lexical job reached `COMPLETED`.
+- Selection: `dragon` was selected from the real EPUB iframe through DOM Range/Selection and epub.js `selected`; toolbar appeared with the exact preview and actions.
+- Found lookup: `GET /api/books/{id}/lexicon/lookup?term=dragon` returned `200`; body lemma `dragon`, translation `dragão`, nonblank local definition; UI displayed `dragon: dragão`.
+- Missing selection: exact `silver moonspire` preview and lookup request were observed; `GET /api/books/{id}/lexicon/lookup?term=silver%20moonspire` returned `200` with an empty body, interpreted as `null` by the test-only API helper.
+- Missing-result UI: expected `No definition is prepared for this selection yet.` was not displayed. Production `frontend/src/api.ts` attempted `response.json()` on the empty successful body; EpubReader displayed `Unexpected end of JSON input` instead. No translation or definition was invented.
+- AI: `APP_AI_ENABLED=false`; no Ollama or external network was used.
+- Focused isolated command: `npx --no-install playwright test --config=e2e/playwright.config.ts e2e/specs/lexical-selection.spec.ts --grep "TEST-027"`; total `1`, pass `0`, failures `1`, skipped `0`, exit code `1`, test duration about `9.2s`.
+- Network evidence (method/path/status only): file `GET .../file 200`; found lookup `GET .../lexicon/lookup?term=dragon 200`; missing lookup `GET .../lexicon/lookup?term=silver%20moonspire 200`.
+- Cleanup: only the `wave-3f-test-027-` fixture book was removed through the normal API flow.
+
+### TEST-028
+
+- Status: `PASS`.
+- Fixture: independent `wave-3f-test-028-` book and lexical job; no dependency on TEST-027 execution.
+- Selection: exact `selectedText=dragon`; toolbar originated from the real EPUB selection path.
+- Lookup: `GET /api/books/{id}/lexicon/lookup?term=dragon` returned `200`; response values were used for translation, definition, pronunciation, and part of speech.
+- Card creation: UI click on `Criar card` produced `POST /api/cards` status `201`.
+- Payload: fixture `bookId`, `selectedText=dragon`, nonblank real `cfiRange`, nonblank chapter title, translation `dragão`, definition/pronunciation/partOfSpeech equal to the real lookup response, `background=""`, `examples=[]`, `relatedWords=[]`; no queueOrder assumption.
+- Persistence: `GET /api/cards` returned the active card (`cardId=55effd23-6d10-4361-8f1d-2b6d2ea79fc1` in the combined run), owner-scoped to the fixture book.
+- UI presentation: creation status was shown; toolbar cleared; Cards view showed front `dragon`; flip showed `dragão` and the lexical definition.
+- Network evidence (method/path/status only): file `GET .../file 200`; lookup `GET .../lexicon/lookup?term=dragon 200`; create `POST /api/cards 201`; list `GET /api/cards?includeArchived=false 200`.
+- Focused isolated command: `npx --no-install playwright test --config=e2e/playwright.config.ts e2e/specs/lexical-selection.spec.ts --grep "TEST-028"`; total `1`, pass `1`, failures `0`, skipped `0`, exit code `0`, duration `27.2s`.
+- Cleanup: only the `wave-3f-test-028-` fixture book was removed; related cards were removed by the normal book cascade and verified absent.
+
+### Combined and regression verification
+
+- Combined command: `npx --no-install playwright test --config=e2e/playwright.config.ts e2e/specs/lexical-selection.spec.ts --grep "TEST-027|TEST-028"`; total `2`, pass `1`, failures `1`, skipped `0`, exit code `1`, duration `37.3s`.
+- `npm run build`: passed.
+- Static contracts (`book-upload.test.mjs`, `card-creation.test.mjs`, `lexicon-entry-contract.test.mjs`, `lexicon-lookup.test.mjs`, `lexicon-start.test.mjs`): total `5`, pass `5`, failures `0`, skipped `0`.
+- TEST-001: `3/3 PASS`.
+- TEST-009: `1/1 PASS`.
+- TEST-013: `2/2 PASS`.
+- TEST-020: `1/1 PASS`.
+- TEST-023: `3/3 PASS`.
+- Production files changed: `NONE`.
+- TEST IDs altered: `TEST-027` and `TEST-028` only. TEST-029 and TEST-039 were not executed.
+
+### Verdict
+
+- `PRODUCT_BUG_CANDIDATE`: `YES` — missing lexical lookup returns successful HTTP 200 with an empty body, while the production client requires JSON and surfaces a parsing error instead of the intended empty-result message.
+- `TEST_INFRASTRUCTURE`: no remaining selection-harness issue; the real iframe selection and epub.js toolbar path were exercised.
+- Recommendation: `DO NOT MERGE — bug fix required`.
