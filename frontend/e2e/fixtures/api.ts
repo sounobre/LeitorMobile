@@ -30,7 +30,7 @@ export type CreateBookInput = {
 };
 
 export type UploadBookContentInput = {
-  epub: { name: string; mimeType: string; buffer: Buffer };
+  epub?: { name: string; mimeType: string; buffer: Buffer };
   cover?: { name: string; mimeType: string; buffer: Buffer };
 };
 
