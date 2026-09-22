@@ -678,3 +678,42 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `TEST-023`: historical detection `FAIL`; final status after fix `PASS`.
 - `FOLLOW_UP_REQUIRED`: missing-file HTTP `401` em runtime E2E versus `404` no outro boundary/caminho documentado. Não investigado nem alterado nesta branch.
 - TEST IDs alterados: somente `TEST-023`; `TEST-009`, `TEST-027`, `TEST-028`, `TEST-029` e `TEST-039` não foram executados.
+
+
+## Follow-up — missing book file HTTP status
+
+- Classificação: diagnostic probe/follow-up; nenhum novo TEST ID foi criado ou alterado.
+- Base utilizada: `origin/main` / `ff7b4691a6ee87a805315a9bde9670585e5d7a28`.
+- Branch/worktree: `probe/missing-book-file-http-status` / `C:\Users\souno\.codex\worktrees\probe-missing-book-file-http-status\LeitorMobile`.
+- Data/hora UTC do registro: `2026-09-21T22:00:00Z`.
+- Database/schema/usuário: `leitor_test` / `public` / `leitor_test_user`; storage temporário; nenhuma produção foi alterada.
+
+### Controls and comparison
+
+- Controle autenticado `GET /api/books`: `200`; a sessão foi aceita.
+- Controle autenticado com EPUB existente `GET /api/books/{id}/file`: `200`, `Content-Type: application/epub+zip`.
+- Book próprio sem EPUB armazenado em HTTP real: `404`, corpo JSON de erro do Spring.
+- A mesma ausência via MockMvc: `404`.
+- Requisição sem Bearer para o Book sem EPUB: `401`.
+
+### Trace
+
+- `BookController.file(id)` foi chamado pelo request autenticado.
+- `BookContentService.open(id, false)` foi chamado e emitiu `ResponseStatusException` com status `404 NOT_FOUND` para o EPUB ausente.
+- O dispatch de erro ocorreu como `REQUEST → ERROR`, com `/error` envolvido.
+- O contexto permaneceu autenticado no request original e no dispatch `ERROR`; o filtro de autenticação de teste registrou os dois estados.
+- O status final do HTTP real permaneceu `404`; não houve divergência service/controller → runtime neste harness.
+
+### Verdict
+
+- Verdict: `REFUTED` para a hipótese de conversão genérica do `404` autenticado em `401` pelo boundary HTTP atual.
+- Primeiro ponto de divergência: nenhum foi observado na reprodução controlada. O `401` histórico do Playwright não foi reproduzido com o mesmo backend, sessão, storage temporário e HTTP real; permanece uma observação específica de condição/harness anterior, sem evidência suficiente para identificar sua causa exata.
+- `PRODUCT_BUG_CANDIDATE`: `NO`.
+- Conclusão operacional: o `401` é o comportamento esperado para ausência de autenticação; com sessão válida, o Book próprio sem arquivo retorna `404` tanto em MockMvc quanto em HTTP real.
+
+### Commands and results
+
+- Probe: `mvn -q -Dtest=MissingBookFileHttpStatusProbeTest test`; total `1`, pass `1`, failures `0`, errors `0`, skipped `0`, exit code `0`.
+- Contrato relacionado: `mvn -q -Dtest=BookControllerApiTest#downloadIsOwnerScopedAndRequiresAnAccessibleManagedFile test`; total `1`, pass `1`, failures `0`, errors `0`, skipped `0`, exit code `0`; MockMvc manteve `404` para o Book próprio sem EPUB.
+- TEST-023 permanece `PASS` após o fix de restauração; nenhum outro TEST ID foi executado.
+- Arquivos alterados nesta investigação: `MissingBookFileHttpStatusProbeTest.java` e este ledger; nenhum arquivo de produção foi alterado.
