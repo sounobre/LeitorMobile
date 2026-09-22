@@ -834,3 +834,27 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 
 - PRODUCT_BUG HTTP error dispatch: `CONFIRMED → FIXED`.
 - No new TEST ID was created or altered.
+
+## Wave 3E — Web library search and covers
+
+### TEST-009
+
+- Status: `PASS`.
+- Base: `origin/main` / `b61ce9ad1f72d393b38de115874ec47328055575`.
+- Branch/worktree: `test/wave-3e-web-library-search` / `C:/Users/souno/.codex/worktrees/wave-3e-web-library-search/LeitorMobile`.
+- Fixture books: `wave-3e-test-009-` prefix; Wave 3E Dragon Atlas (Ari Vale, cover present), Wave 3E Quiet Harbor (Mira SearchAuthor, no cover), Wave 3E Unrelated Chronicle (Elsewhere Writer, no cover).
+- Initial state: `3 resultados`; all three fixture tiles were visible.
+- Cover-present result: `coverAvailable=true`, `GET /api/books/{id}/cover = 200`, accessible image `Capa de Wave 3E Dragon Atlas` visible.
+- Cover-absent result: `coverAvailable=false`; Quiet Harbor remained visible with title and author and had no `<img>`.
+- Title search: `Dragon Atlas` returned only Dragon Atlas; count `1 resultados`.
+- Author search: `Mira SearchAuthor` returned only Quiet Harbor; count `1 resultados`; the no-cover item remained visible.
+- Case-insensitive characterization: `mira searchauthor` returned Quiet Harbor; count `1 resultados`.
+- Zero-result state: `wave-3e-no-such-book` returned `0 resultados` with “Nenhum livro encontrado” and “Tente outro título ou autor.”.
+- Clear-search state: clearing the field returned all three fixture books and `3 resultados`.
+- Network evidence (method/path/status only): `GET /api/books 200`; `GET /api/books?search=Dragon%20Atlas 200`; `GET /api/books?search=Mira%20SearchAuthor 200`; `GET /api/books?search=mira%20searchauthor 200`; `GET /api/books?search=wave-3e-no-such-book 200`; `GET /api/books 200`; `GET /api/books/{id}/cover 200`.
+- Focused execution: `npx --no-install playwright test --config=e2e/playwright.config.ts e2e/specs/library.spec.ts --grep "TEST-009"`; Chromium, total `1`, pass `1`, failures `0`, skipped `0`, exit code `0`, duration `25.7s`.
+- Baseline: frontend build passed; static contracts `5/5`; TEST-001 `3/3`, TEST-013 `2/2`, TEST-020 `1/1`, TEST-023 `3/3`.
+- Final regression: build passed; static contracts `5/5`; TEST-001 `3/3`, TEST-009 `1/1`, TEST-013 `2/2`, TEST-020 `1/1`, TEST-023 `3/3`.
+- Cleanup: only `wave-3e-test-009-` fixture books were deleted through the normal API cleanup flow; no storage-wide deletion was used.
+- Production files changed: `NONE`.
+- TEST IDs altered: `TEST-009` only; TEST-001, TEST-013, TEST-020 and TEST-023 remain PASS.

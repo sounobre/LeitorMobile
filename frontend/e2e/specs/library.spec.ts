@@ -198,3 +198,143 @@ test.describe('TEST-020 exclusão web remove livro e conteúdo gerenciado', () =
     }
   });
 });
+
+const searchAndCoverFixturePrefix = 'wave-3e-test-009-';
+
+test.describe('TEST-009 pesquisa web e capas na biblioteca', () => {
+  test.beforeEach(async ({ request, account }) => {
+    const api = createApiClient(request);
+    const session = await api.login(account);
+    await api.deleteBooksWithPrefix(session.token, searchAndCoverFixturePrefix);
+  });
+
+  test.afterEach(async ({ request, account }) => {
+    const api = createApiClient(request);
+    const session = await api.login(account);
+    await api.deleteBooksWithPrefix(session.token, searchAndCoverFixturePrefix);
+  });
+
+  test('TEST-009 filtra por título e autor, preserva item sem capa e mostra estado vazio', async ({ page, request, account }) => {
+    const api = createApiClient(request);
+    const session = await api.login(account);
+    const bookA = await api.createBook(session.token, {
+      originalName: searchAndCoverFixturePrefix + 'dragon-atlas.epub',
+      fileHash: searchAndCoverFixturePrefix + 'dragon-atlas',
+      title: 'Wave 3E Dragon Atlas',
+      author: 'Ari Vale',
+      language: 'en',
+    });
+    const bookB = await api.createBook(session.token, {
+      originalName: searchAndCoverFixturePrefix + 'quiet-harbor.epub',
+      fileHash: searchAndCoverFixturePrefix + 'quiet-harbor',
+      title: 'Wave 3E Quiet Harbor',
+      author: 'Mira SearchAuthor',
+      language: 'en',
+    });
+    const bookC = await api.createBook(session.token, {
+      originalName: searchAndCoverFixturePrefix + 'unrelated-chronicle.epub',
+      fileHash: searchAndCoverFixturePrefix + 'unrelated-chronicle',
+      title: 'Wave 3E Unrelated Chronicle',
+      author: 'Elsewhere Writer',
+      language: 'en',
+    });
+
+    const withCover = await api.uploadBookContent(session.token, bookA.id, {
+      cover: {
+        name: searchAndCoverFixturePrefix + 'dragon-atlas.jpg',
+        mimeType: 'image/jpeg',
+        buffer: syntheticJpeg(),
+      },
+    });
+    expect(withCover.coverAvailable).toBe(true);
+
+    const fixtureBooks = (await api.listBooks(session.token)).filter((book) => book.fileHash.startsWith(searchAndCoverFixturePrefix));
+    expect(new Set(fixtureBooks.map((book) => book.id))).toEqual(new Set([bookA.id, bookB.id, bookC.id]));
+    expect(fixtureBooks.find((book) => book.id === bookA.id)?.coverAvailable).toBe(true);
+    expect(fixtureBooks.find((book) => book.id === bookB.id)?.coverAvailable).toBe(false);
+    expect(fixtureBooks.find((book) => book.id === bookC.id)?.coverAvailable).toBe(false);
+
+    const networkEvidence: Array<{ method: string; path: string; status: number }> = [];
+    page.on('response', (response) => {
+      const requestMethod = response.request().method();
+      const url = new URL(response.url());
+      const isBookList = url.pathname === '/api/books';
+      const isDragonCover = url.pathname === '/api/books/' + bookA.id + '/cover';
+      if (requestMethod === 'GET' && (isBookList || isDragonCover)) {
+        networkEvidence.push({ method: requestMethod, path: url.pathname + url.search, status: response.status() });
+      }
+    });
+
+    await page.goto('/');
+    await loginThroughUi(page, account);
+    await expect(page.getByRole('heading', { name: 'Livros' })).toBeVisible();
+    await expect(page.locator('.result-count')).toHaveText('3 resultados');
+
+    const dragonTile = page.getByRole('heading', { name: bookA.title }).locator('xpath=ancestor::article[1]');
+    const harborTile = page.getByRole('heading', { name: bookB.title }).locator('xpath=ancestor::article[1]');
+    const unrelatedTile = page.getByRole('heading', { name: bookC.title }).locator('xpath=ancestor::article[1]');
+    await expect(dragonTile).toBeVisible();
+    await expect(dragonTile.getByText('Ari Vale')).toBeVisible();
+    await expect(dragonTile.getByRole('img', { name: 'Capa de Wave 3E Dragon Atlas' })).toBeVisible();
+    await expect.poll(() => networkEvidence.filter((item) => item.path === '/api/books/' + bookA.id + '/cover').length).toBeGreaterThan(0);
+    expect(networkEvidence.find((item) => item.path === '/api/books/' + bookA.id + '/cover')?.status).toBe(200);
+
+    await expect(harborTile).toBeVisible();
+    await expect(harborTile.getByText('Mira SearchAuthor')).toBeVisible();
+    await expect(harborTile.getByRole('img')).toHaveCount(0);
+    await expect(unrelatedTile).toBeVisible();
+    await expect(unrelatedTile.getByText('Elsewhere Writer')).toBeVisible();
+
+    const search = page.getByPlaceholder('Buscar por título ou autor');
+    const waitForSearch = async (term: string) => {
+      const responsePromise = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return response.request().method() === 'GET'
+          && url.pathname === '/api/books'
+          && url.searchParams.get('search') === term;
+      });
+      await search.fill(term);
+      expect((await responsePromise).status()).toBe(200);
+    };
+
+    await waitForSearch('Dragon Atlas');
+    await expect(dragonTile).toBeVisible();
+    await expect(harborTile).toHaveCount(0);
+    await expect(unrelatedTile).toHaveCount(0);
+    await expect(page.locator('.result-count')).toHaveText('1 resultados');
+
+    await waitForSearch('Mira SearchAuthor');
+    await expect(harborTile).toBeVisible();
+    await expect(dragonTile).toHaveCount(0);
+    await expect(unrelatedTile).toHaveCount(0);
+    await expect(page.locator('.result-count')).toHaveText('1 resultados');
+    await expect(harborTile.getByRole('img')).toHaveCount(0);
+
+    await waitForSearch('mira searchauthor');
+    await expect(harborTile).toBeVisible();
+    await expect(page.locator('.result-count')).toHaveText('1 resultados');
+
+    await waitForSearch('wave-3e-no-such-book');
+    await expect(page.getByText('Nenhum livro encontrado')).toBeVisible();
+    await expect(page.getByText('Tente outro título ou autor.')).toBeVisible();
+    await expect(page.locator('.result-count')).toHaveText('0 resultados');
+    await expect(page.getByRole('heading', { name: bookA.title })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: bookB.title })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: bookC.title })).toHaveCount(0);
+
+    const clearResponsePromise = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === 'GET'
+        && url.pathname === '/api/books'
+        && !url.searchParams.has('search');
+    });
+    await search.fill('');
+    expect((await clearResponsePromise).status()).toBe(200);
+    await expect(dragonTile).toBeVisible();
+    await expect(harborTile).toBeVisible();
+    await expect(unrelatedTile).toBeVisible();
+    await expect(page.locator('.result-count')).toHaveText('3 resultados');
+
+    console.log('TEST-009 network evidence ' + JSON.stringify(networkEvidence));
+  });
+});
