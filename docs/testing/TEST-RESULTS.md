@@ -1049,3 +1049,23 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `SECURITY_BUG_CANDIDATE`: none; owner list isolation, missing resource behavior, and cross-owner mutation were verified.
 - `TEST_INFRASTRUCTURE`: none in final execution; initial local Playwright CLI absence was resolved by installing the locked frontend dev dependencies in the isolated worktree, with no source or production change.
 - Recommendation: `WAVE 3 COMPLETE — MERGE SAFE`.
+
+## Wave 4 preflight — Jest discovery infrastructure fix
+
+- Previous result: Wave 4A `BLOCKED` / `TEST_INFRASTRUCTURE`.
+- Root cause: the configured `<rootDir>/src/**/*.test.ts` was expanded to an absolute Windows glob with mixed path separators, so Jest discovered zero tests.
+- Before: `jest --listTests` returned `0`; the filesystem contained exactly 10 `src/**/*.test.ts` files.
+- Production change: `NONE`.
+- Test infrastructure change: `leitor-epub/package.json` now scopes Jest with `roots: ["<rootDir>/src"]` and uses the relative `testMatch: ["**/*.test.ts"]`.
+- After: `jest --listTests` returned exactly `10`; all paths were under `leitor-epub/src`, with none from `node_modules`, `build`, `dist`, or `android`.
+- Full baseline: `npm test -- --runInBand` — `10` suites, `41` tests, `41` passed, `0` failures, `0` skipped, exit code `0`; Jest duration `6.035s`.
+- Typecheck: `npm run typecheck` — PASS, exit code `0`.
+- Explicit runner check: `src/db/migrations.test.ts` — `1` suite, `2` tests passed; runner and transform were functional after discovery was fixed.
+- Import-focused preflight: `src/services/epubImport.test.ts` and `src/services/epubSecurity.test.ts` — `2` suites, `17` tests passed, `0` failures, `0` skipped, exit code `0`; Jest duration `7.019s`.
+- Dependency changes: none; no dependency installation was performed for this fix and `package-lock.json` is unchanged.
+- Device/emulator/Android: not used.
+- TEST IDs altered: `NONE`.
+- `TEST-018`: `NOT EXECUTED` as Wave 4A.
+- `TEST-050`: `NOT EXECUTED` as Wave 4A.
+- `TEST_INFRASTRUCTURE`: discovery fix verified; no production behavior was changed.
+- Recommendation: retry Wave 4A from updated main; do not resume Wave 4A in this infrastructure-fix branch.
