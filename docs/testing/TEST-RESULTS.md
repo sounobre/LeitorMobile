@@ -1174,3 +1174,28 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `PRODUCT_BUG_CANDIDATE`: none.
 - `TEST_INFRASTRUCTURE`: none.
 - Production files changed: `NONE`.
+
+## Wave 4C — Mobile backup package integration
+
+### TEST-049
+
+- Status: FAIL — PRODUCT_BUG_CANDIDATE; não promovido a PASS.
+- Base: origin/main / 4d3fe1e6033379dc5b5e76a603569720f7b755c1.
+- Snapshot da caracterização: 1 livro sintético (book-049), fileUri=mock://books/source.epub, coverUri=mock://covers/missing.jpg, progresso 0.42; annotations, bookmarks, cards, preferences, lookupCache e lexicon vazios.
+- Arquivo EPUB de origem: bytes sintéticos; filesystem inteiramente fake. JSZip real; sem SQLite.
+- Candidato confirmado: o ZIP exportado grava library.json com coverUri=covers/book-049.jpg, mas covers/book-049.jpg não está no ZIP e não aparece em manifest.files. O pickAndValidateBackup() aplicado aos mesmos bytes rejeita com: O manifesto não protege todos os arquivos do livro “Wave 4C Backup Book”.
+- Comportamento com arquivo de capa existente: não executado. Cenário coverUri=null: não executado.
+- EPUB entry/bytes, lista completa do manifest e hashes SHA-256 independentes: não verificados após a parada exigida pelo candidato.
+- Validação do pacote exportado: rejeitada; bookCount não retornado. Tamper detection: não executado.
+- Missing EPUB: não executado. Restore: não invocado.
+- Sharing: mock disponível (true), chamado uma vez com mimeType=application/zip e dialogTitle=Salvar backup do Leitor EPUB.
+- Device/emulator: NO. Filesystem real: NO. Rede real durante o teste: NO; npm ci --prefer-offline foi apenas setup e pode consultar o registry.
+- TEST-050: os 12 casos já existentes passaram na execução focada; ID e assertions preservados.
+- Dependências: npm ci --prefer-offline instalou 1098 pacotes em 3 min; lockfile sem alteração.
+- Baseline anterior às edições: npm run typecheck PASS; Jest 11 suites, 95 tests, 95 passed, 0 failures, 0 skipped; Jest duration 15.913s.
+- Reprodução focada: npm test -- --runInBand src/services/backup.test.ts; 1 suite, 13 tests, 12 passed, 1 failure (a expectativa de validação do pacote recém-exportado), 0 skipped; Jest duration 4.187s; exit code 1.
+- A execução foi interrompida ao confirmar a divergência. Typecheck e regressão completa pós-edição não foram executados; TEST-035, Android/device e Wave 5 não foram executados.
+- PRODUCT_BUG_CANDIDATE: exportação gera um backup que o próprio validador rejeita quando coverUri existe no snapshot, mas o arquivo de capa não existe.
+- Production files changed: NONE.
+- TEST IDs alterados nesta execução: TEST-049 somente; TEST-050 permanece PASS.
+- Recommendation: DO NOT MERGE — bug fix required; corrigir em trabalho separado e reexecutar TEST-049.

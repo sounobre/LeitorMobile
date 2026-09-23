@@ -9,8 +9,10 @@ jest.mock('expo-file-system', () => {
   class MockFile {
     readonly uri: string;
 
-    constructor(uri: string) {
-      this.uri = uri;
+    constructor(uriOrDirectory: string | MockDirectory, name?: string) {
+      this.uri = typeof uriOrDirectory === 'string'
+        ? uriOrDirectory
+        : uriOrDirectory.uri + '/' + (name ?? '');
     }
 
     get exists(): boolean {
@@ -26,15 +28,31 @@ jest.mock('expo-file-system', () => {
       if (!bytes) throw new Error(`Missing fixture file: ${this.uri}`);
       return new Uint8Array(bytes);
     }
+
+    write(bytes: Uint8Array): void {
+      bytesByUri.set(this.uri, new Uint8Array(bytes));
+    }
   }
   class MockDirectory {
-    readonly uri = 'mock://directory';
+    readonly uri: string;
+
+    constructor(parent?: { uri?: string }, name?: string) {
+      const parentUri = parent?.uri ?? 'mock://directory';
+      this.uri = name ? parentUri + '/' + name : parentUri;
+    }
+
+    create(_options?: { idempotent?: boolean; intermediates?: boolean }): void {}
   }
   return {
     File: MockFile,
     Directory: MockDirectory,
-    Paths: { document: {}, cache: {} },
+    Paths: { document: { uri: 'mock://document' }, cache: { uri: 'mock://cache' } },
     __setMockBytes: (uri: string, bytes: Uint8Array) => bytesByUri.set(uri, new Uint8Array(bytes)),
+    __getMockBytes: (uri: string) => {
+      const bytes = bytesByUri.get(uri);
+      return bytes ? new Uint8Array(bytes) : undefined;
+    },
+    __clearMockBytes: () => bytesByUri.clear(),
   };
 });
 
@@ -59,15 +77,19 @@ jest.mock('@/db/repository', () => ({
 
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import { replaceSnapshot } from '@/db/repository';
-import { pickAndValidateBackup } from './backup';
+import * as Sharing from 'expo-sharing';
+import { exportSnapshot, replaceSnapshot } from '@/db/repository';
+import { createAndShareBackup, pickAndValidateBackup } from './backup';
 
 type BackupFileSystemMocks = {
   __setMockBytes: (uri: string, bytes: Uint8Array) => void;
+  __getMockBytes: (uri: string) => Uint8Array | undefined;
+  __clearMockBytes: () => void;
 };
 
 const documentPickerMock = DocumentPicker.getDocumentAsync as jest.Mock;
 const fileSystemMocks = FileSystem as unknown as BackupFileSystemMocks;
+const exportSnapshotMock = exportSnapshot as jest.Mock;
 const replaceSnapshotMock = replaceSnapshot as jest.Mock;
 const backupUri = 'mock://backup.zip';
 
@@ -135,6 +157,66 @@ async function expectValidationRejection(bytes: Uint8Array): Promise<void> {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  fileSystemMocks.__clearMockBytes();
+});
+
+describe('TEST-049 — pacote exportado com cover referenciada ausente', () => {
+  it('reproduz PRODUCT_BUG_CANDIDATE: biblioteca aponta para cover fora do ZIP e o próprio validator rejeita o pacote', async () => {
+    const db = {} as never;
+    const sourceBytes = new TextEncoder().encode('SYNTHETIC EPUB TEST-049');
+    const snapshot = {
+      books: [{
+        id: 'book-049',
+        fileUri: 'mock://books/source.epub',
+        fileHash: 'a'.repeat(64),
+        originalName: 'wave-4c.epub',
+        title: 'Wave 4C Backup Book',
+        author: 'Synthetic Author',
+        language: 'en',
+        coverUri: 'mock://covers/missing.jpg',
+        description: 'Synthetic description',
+        publisher: 'Synthetic publisher',
+        importedAt: '2026-09-23T00:00:00.000Z',
+        lastOpenedAt: null,
+        lastCfi: null,
+        progress: 0.42,
+        locationsJson: null,
+      }],
+      annotations: [],
+      bookmarks: [],
+      cards: [],
+      preferences: [],
+      lookupCache: [],
+      lexicon: [],
+    };
+    fileSystemMocks.__setMockBytes('mock://books/source.epub', sourceBytes);
+    exportSnapshotMock.mockResolvedValue(snapshot);
+    (Sharing.isAvailableAsync as jest.Mock).mockResolvedValue(true);
+    (Sharing.shareAsync as jest.Mock).mockResolvedValue(undefined);
+
+    const destinationUri = await createAndShareBackup(db);
+    const exportedBytes = fileSystemMocks.__getMockBytes(destinationUri);
+    expect(exportedBytes).toBeDefined();
+    if (!exportedBytes) throw new Error('Exported ZIP bytes were not captured.');
+
+    const zip = await JSZip.loadAsync(exportedBytes);
+    const portableLibrary = JSON.parse(await zip.file('library.json')!.async('text'));
+    const manifest = JSON.parse(await zip.file('manifest.json')!.async('text'));
+    expect(portableLibrary.books[0].coverUri).toBe('covers/book-049.jpg');
+    expect(zip.file('covers/book-049.jpg')).toBeNull();
+    expect(manifest.files['covers/book-049.jpg']).toBeUndefined();
+    expect(destinationUri).toMatch(/^mock:\/\/cache\/backups\/leitor-epub-.*\.zip$/);
+    expect(exportSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(exportSnapshotMock).toHaveBeenCalledWith(db);
+    expect(Sharing.shareAsync).toHaveBeenCalledTimes(1);
+    expect(Sharing.shareAsync).toHaveBeenCalledWith(destinationUri, expect.objectContaining({
+      mimeType: 'application/zip',
+      dialogTitle: 'Salvar backup do Leitor EPUB',
+    }));
+
+    selectBackup(exportedBytes);
+    await expect(pickAndValidateBackup(db)).resolves.toEqual(expect.objectContaining({ bookCount: 1 }));
+  });
 });
 
 describe('TEST-050 — validação de backup antes do restore', () => {
