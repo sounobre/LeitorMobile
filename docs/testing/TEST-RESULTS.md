@@ -996,3 +996,56 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `PRODUCT_BUG_CANDIDATE`: none.
 - `TEST_INFRASTRUCTURE`: none; the component was isolated from `App`, backend, database, and external network.
 - Recommendation: `MERGE SAFE`.
+
+## Wave 3H — Web cards lifecycle
+
+### TEST-039
+
+- Status: `PASS`.
+- Base: `origin/main` / `3ae005f98ea1991a24667f88b7e15583b4d621e6`.
+- Branch/worktree: `test/wave-3h-web-cards-lifecycle` / `D:\LeitorMobile\frontend\dist\wave-3h-worktree`.
+- Own fixture: one Book created by API only to satisfy the card foreign key; title `Wave 3H Cards Lifecycle`, own fixture prefix `wave-3h-test-039-`.
+- Own cards: CARD-A `wave-3h-alpha`, CARD-B `wave-3h-beta`, CARD-C `wave-3h-gamma` created in that order by API; CARD-D `wave-3h-archived` created and archived by API before the UI opened.
+- Pre-UI API: `GET /api/cards?includeArchived=false` returned A/B/C only; `GET /api/cards?includeArchived=true` returned A/B/C/D and D was archived. No value, formula, uniqueness, or consecutiveness assertion was made for `queueOrder`.
+- Initial UI: Cards navigation issued `GET /api/cards?includeArchived=false = 200`; heading `Cards de estudo`; current A `wave-3h-alpha`; counter `3 na fila`; archived D was not visible.
+- Flip: the real card view showed A's `alpha traduzido` and `alpha definition`.
+- Edit UI: `Editar` changed selected text to `wave-3h-alpha-edited`, translation to `alpha editado`, and definition to `alpha edited definition`; UI `PATCH /api/cards/{A}` returned `200`; modal closed and the UI updated.
+- Edit persistence: API verification found the edited fields on A; navigating `Biblioteca → Cards` triggered a fresh active-card GET and A remained edited.
+- Archive UI: `Arquivar` on A used `POST /api/cards/{A}/archive = 200`; active UI became B with `2 na fila`; active API list excluded A and includeArchived API list showed A archived.
+- Archive persistence: navigating `Biblioteca → Cards` triggered another active-card GET; A stayed out and B remained current.
+- Move-to-end UI: `Rever depois` on B used `POST /api/cards/{B}/move-to-end = 200`; immediate next card was C.
+- Move persistence: API active order had C before B, and after another `Biblioteca → Cards` reload the UI still showed C; API order still had C before B.
+- Missing resource: one authenticated `PATCH /api/cards/{missing}` returned `404`; response contained no card payload or other-owner card data.
+- Cross-owner fixture: PostgreSQL test-only seed created one synthetic `app_users`, one `books`, and one `cards` row with generated UUIDs and `wave-3h-test-039-other-<uuid>@example.test`; the principal user's `GET /api/cards?includeArchived=true` did not expose it.
+- Cross-owner mutation: principal-user `PATCH /api/cards/{other}` returned `404`; the response contained no card payload; direct DB verification confirmed the other card remained with `selected_text=wave-3h-other-owner-card`.
+- Direct PostgreSQL use: `TEST FIXTURE ONLY`; host `127.0.0.1`, database `leitor_test`, user `leitor_test_user`, password passed only through `PGPASSWORD`; `psql --version` returned `16.14`.
+- Network evidence (method/path/status only): UI list `GET /api/cards?includeArchived=false = 200` on initial/edit/archive/move reloads; `PATCH /api/cards/{A} = 200`; `POST /api/cards/{A}/archive = 200`; `POST /api/cards/{B}/move-to-end = 200`; negative list `GET /api/cards?includeArchived=true = 200`; missing and cross-owner `PATCH /api/cards/{id} = 404`.
+- UI evidence: initial A / 3 na fila; after edit A-edited; after archive B / 2 na fila; after move C; after reload C.
+- Numeric `queueOrder` assertions: `NONE`.
+- Cleanup: own Book removed through API with FK cascade; fixture cards absent; other-owner user removed by exact generated owner ID with cascade; final fixture absence confirmed; no truncate or whole-database cleanup.
+- Focused command: `npx --no-install playwright test --config=e2e/playwright.config.ts e2e/specs/cards.spec.ts --grep "TEST-039"`; Chromium, total `2`, pass `2`, failures `0`, skipped `0`, exit code `0`, duration `36.0s`.
+- Production files changed: `NONE`.
+- TEST IDs altered: `TEST-039` only.
+
+## Wave 3 — Closure
+
+- Final build: `npm run build` exit code `0`.
+- Static tests: `book-upload.test.mjs`, `card-creation.test.mjs`, `lexicon-entry-contract.test.mjs`, `lexicon-lookup.test.mjs`, `lexicon-start.test.mjs`, `nullable-api-response.test.mjs`; total `6`, pass `6`, failures `0`, skipped `0`, exit code `0`.
+- Final E2E_WEB regression command: `npx --no-install playwright test --config=e2e/playwright.config.ts e2e/specs/library.spec.ts e2e/specs/upload.spec.ts e2e/specs/reader.spec.ts e2e/specs/lexical-selection.spec.ts e2e/specs/cards.spec.ts --grep "TEST-001|TEST-009|TEST-013|TEST-020|TEST-023|TEST-027|TEST-028|TEST-039"`; Chromium, total `14`, pass `14`, failures `0`, skipped `0`, exit code `0`, duration `56.6s`.
+- Final component regression: `npx --no-install playwright test --config=component-tests/playwright.config.ts component-tests/lexicon-modal.spec.ts --grep "TEST-029"`; Chromium, total `2`, pass `2`, failures `0`, skipped `0`, exit code `0`, duration `4.3s`.
+- TEST-001: `PASS`.
+- TEST-009: `PASS`.
+- TEST-013: `PASS`.
+- TEST-020: `PASS`.
+- TEST-023: `PASS`.
+- TEST-027: `PASS`.
+- TEST-028: `PASS`.
+- TEST-029: `PASS`.
+- TEST-039: `PASS`.
+- Wave 3 final: `9/9 PASS`.
+- Bugs discovered during Wave 3 and already fixed: reader same-session progress/CFI stale state; HTTP ERROR dispatch `404 → 401`; nullable frontend API responses.
+- QueueOrder was discovered in Wave 2 and is not attributed to Wave 3; TEST-041/TEST-042 remain the numeric queue-order coverage.
+- `PRODUCT_BUG_CANDIDATE`: none.
+- `SECURITY_BUG_CANDIDATE`: none; owner list isolation, missing resource behavior, and cross-owner mutation were verified.
+- `TEST_INFRASTRUCTURE`: none in final execution; initial local Playwright CLI absence was resolved by installing the locked frontend dev dependencies in the isolated worktree, with no source or production change.
+- Recommendation: `WAVE 3 COMPLETE — MERGE SAFE`.
