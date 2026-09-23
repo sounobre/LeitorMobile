@@ -1069,3 +1069,51 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `TEST-050`: `NOT EXECUTED` as Wave 4A.
 - `TEST_INFRASTRUCTURE`: discovery fix verified; no production behavior was changed.
 - Recommendation: retry Wave 4A from updated main; do not resume Wave 4A in this infrastructure-fix branch.
+
+## Wave 4A — Mobile P0 without device
+
+### TEST-018
+
+- Status: `PASS`.
+- Base: `origin/main` / `dd7239b504bbb0ec1b61f0ea95f19b6c1f7719cf`.
+- Harness: Jest Expo with real JSZip fixtures; no device, Android, emulator, or external network.
+- EPUB 2.0 fluid: `PASS`; EPUB 3.0 fluid: `PASS`.
+- Mimetype: absent and invalid MIME rejected with the existing EPUB identifier error.
+- Container/OPF: missing container, missing full-path, unsafe package path, and missing OPF rejected.
+- Manifest/spine: empty manifest and absent spine rejected with the existing structure error.
+- Fixed layout: rejected.
+- DRM/encryption: unsupported algorithm rejected; known font obfuscation unit coverage preserved.
+- Remote resource: existing remote image case preserved; security resource detectors remain green.
+- Unsafe path: integrated loaded-ZIP entry with unsafe name rejected; direct path variants remain covered in `epubSecurity.test.ts`.
+- Entry limit: `10_001` synthetic entries rejected without large payload allocation.
+- Text-entry limit: metadata-only `10 MB + 1` fixture rejected without allocating 10 MB.
+- Expanded-size limit: metadata-only `500 MB + 1` fixture rejected without allocating hundreds of MB.
+- Archive-byte limit: not materialized in unit memory; no production change made to force it.
+- ZIP/CRC: `PASS` through `importEpub()` with minimal DocumentPicker, File, Crypto, and repository mocks; corrupted stored-entry CRC rejected.
+- Focused command: `npm test -- --runInBand src/services/epubImport.test.ts src/services/epubSecurity.test.ts`; `2` suites, `32` tests, `32` passed, `0` failures, `0` skipped, exit code `0`; Jest duration `4.337s`.
+
+### TEST-050
+
+- Status: `PASS`.
+- Harness: new test-only `backup.test.ts`, real JSZip artifacts, controlled mocks for DocumentPicker, FileSystem, Crypto, Sharing, and repository; no device or network.
+- Valid backup control: `PreparedBackupRestore` returned with `bookCount=0`; `replaceSnapshot` was not called during validation.
+- Corrupt/non-ZIP: rejected; CRC-corrupted ZIP also rejected.
+- Missing entries: missing `manifest.json` and missing `library.json` rejected.
+- Invalid JSON: truncated/invalid `manifest.json` and `library.json` rejected.
+- Invalid schema: invalid manifest format/version and incomplete snapshot schema rejected.
+- Invalid references: annotation pointing to a missing book rejected before returning prepared restore.
+- Checksum mismatch: deterministic `library.json` hash mismatch rejected.
+- Restore invoked during validation: `NO` for the valid control and every negative; `replaceSnapshot` remained uncalled.
+- Focused command: `npm test -- --runInBand src/services/backupValidation.test.ts src/services/backup.test.ts`; `2` suites, `19` tests, `19` passed, `0` failures, `0` skipped, exit code `0`; Jest duration `2.561s`.
+
+### Wave 4A regression
+
+- `npm run typecheck`: `PASS`, exit code `0`.
+- Full Jest: `11` suites, `68` tests, `68` passed, `0` failures, `0` skipped, exit code `0`; Jest duration `5.160s`.
+- TEST-018: `PASS`.
+- TEST-050: `PASS`.
+- TEST IDs promoted: `TEST-018`, `TEST-050` only.
+- `PRODUCT_BUG_CANDIDATE`: none.
+- `TEST_INFRASTRUCTURE`: none after the merged Jest discovery fix.
+- Production files changed: `NONE`.
+- TEST-012, TEST-026, TEST-031, TEST-035, TEST-037, TEST-049, and Wave 5 were not executed.
