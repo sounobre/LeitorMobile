@@ -157,6 +157,7 @@ export async function createAndShareBackup(db: SQLiteDatabase): Promise<string> 
     zip.file(bookPath, bytes, { binary: true });
     files[bookPath] = await hashBytes(bytes);
 
+    let portableCoverUri: string | null = null;
     const coverPath = portableCoverPath(book);
     if (coverPath && book.coverUri) {
       const cover = new File(book.coverUri);
@@ -164,9 +165,10 @@ export async function createAndShareBackup(db: SQLiteDatabase): Promise<string> 
         const coverBytes = await cover.bytes();
         zip.file(coverPath, coverBytes, { binary: true });
         files[coverPath] = await hashBytes(coverBytes);
+        portableCoverUri = coverPath;
       }
     }
-    portableBooks.push({ ...book, fileUri: bookPath, coverUri: coverPath });
+    portableBooks.push({ ...book, fileUri: bookPath, coverUri: portableCoverUri });
   }
 
   const portableSnapshot: LibrarySnapshot = { ...snapshot, books: portableBooks };

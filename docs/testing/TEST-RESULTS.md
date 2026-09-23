@@ -1199,3 +1199,31 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Production files changed: NONE.
 - TEST IDs alterados nesta execução: TEST-049 somente; TEST-050 permanece PASS.
 - Recommendation: DO NOT MERGE — bug fix required; corrigir em trabalho separado e reexecutar TEST-049.
+
+## TEST-049 confirmed bug — missing optional cover TDD fix
+
+- Historical detection: FAIL reproduced in commit 66591238002c1026b1017d0ed3b9c42409cb8867 before the fix.
+- Root cause: createAndShareBackup derived portableCoverPath from the source URI and assigned it to portableBooks even when File.exists was false. The ZIP and manifest omitted that cover, so pickAndValidateBackup rejected the exporter’s own artifact.
+- RED: the corrected regression expected portable coverUri=null and self-validation. Before the production change, the focused test failed because library.json contained covers/book-049.jpg.
+- Production fix: only leitor-epub/src/services/backup.ts changed. portableCoverUri starts as null and is assigned only after the existing cover bytes are written to the ZIP and their hash is added to the manifest. EPUB remains mandatory. backupValidation.ts and the validator’s manifest-protection check were not changed.
+- Cover present: ZIP entries manifest.json, library.json, books/book-049.epub, and covers/book-049.jpg; portable paths are books/book-049.epub and covers/book-049.jpg. Extracted EPUB and cover bytes equal their synthetic source bytes.
+- CoverUri null: export and self-validation pass; no cover entry or manifest checksum; portable coverUri remains null.
+- Missing physical optional cover: export and self-validation pass; no cover entry or checksum; portable coverUri is null; PreparedBackupRestore returned with bookCount=1.
+- Snapshot preservation: one synthetic book, annotation, bookmark, card, reader preference, lookup cache, and lexicon entry survive in library.json.
+- Manifest: format leitor-epub-backup, version 1, valid ISO createdAt, and exactly the protected EPUB, cover (when present), and library.json paths. No manifest checksum is asserted.
+- Independent SHA-256: node:crypto recomputed hashes over EPUB, cover, and exact library.json bytes extracted from the ZIP; all three match manifest.files and are 64 lowercase hexadecimal characters.
+- Tamper detection: changed annotation content in library.json, regenerated the ZIP without changing manifest.json; pickAndValidateBackup rejected the changed library hash. Restore was not invoked.
+- Missing EPUB: export rejects with the existing “O arquivo do livro … não foi encontrado.” error; Sharing.shareAsync is not called.
+- Sharing: mocked available; shareAsync called once with application/zip and “Salvar backup do Leitor EPUB”.
+- Validation: all three ordinary exports (cover present, coverUri null, and referenced cover physically absent) validate through pickAndValidateBackup with bookCount=1. No prepared.restore call; replaceSnapshot remains uncalled.
+- Device/emulator: NO. Real filesystem: NO. External network in tests: NO. Snapshot/files are synthetic and small.
+- Focused command: npm test -- --runInBand src/services/backup.test.ts; 1 suite, 17 tests, 17 passed, 0 failures, 0 skipped; Jest duration 3.917s.
+- Typecheck: npm run typecheck PASS.
+- Full mobile regression: npm test -- --runInBand; 11 suites, 100 tests, 100 passed, 0 failures, 0 skipped; Jest duration 7.276s.
+- TEST-049 final status: PASS. Historical RED detection remains documented above; final characterization is GREEN.
+- TEST-050: PASS preserved (12 existing tests pass).
+- TEST-012, TEST-018, TEST-026, TEST-031, TEST-037, and TEST-050 remain PASS. TEST-035, Android/device/emulator, and Wave 5 were not executed.
+- PRODUCT_BUG missing optional cover: CONFIRMED -> FIXED.
+- Production files changed: leitor-epub/src/services/backup.ts only.
+- TEST IDs altered in Wave 4C: TEST-049 only.
+- Recommendation: MERGE SAFE after final verification and selective fix commit.
