@@ -1117,3 +1117,60 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - `TEST_INFRASTRUCTURE`: none after the merged Jest discovery fix.
 - Production files changed: `NONE`.
 - TEST-012, TEST-026, TEST-031, TEST-035, TEST-037, TEST-049, and Wave 5 were not executed.
+
+## Wave 4B — Mobile unit contracts
+
+### TEST-012
+
+- Status: `PASS`.
+- Base: `origin/main` / `1db3c4bb0d7606b429f07e8aa9860ece63c64056`.
+- Version 0: WAL and foreign keys are enabled; all six exclusive migrations run; final `user_version=6`.
+- Version 5: only migration v6 runs in one exclusive transaction; final `user_version=6`.
+- Version 6: no migration, exclusive transaction, or version rewrite occurs.
+- Version 7: rejected as a newer database version before any migration transaction.
+- Atomicity evidence: each migration schema statement and its `PRAGMA user_version` update are observed through the same exclusive transaction callback.
+- Focused result: `1` suite, `4` tests, `4` passed, `0` failures, `0` skipped, exit code `0`.
+
+### TEST-026
+
+- Status: `PASS`.
+- Progress: boundaries `0`, `0.5`, and `1`; legacy percentages `5`, `100`, and `140`; negatives clamp to `0`; `NaN` and infinities follow the current `0` contract.
+- Locations: empty list returns `null`; bounded endpoints and current intermediate rounding are covered.
+- Reader bridge valid events: `ReaderReady`, `Relocated`, `SelectionChanged`, `SearchResults`, `ExternalLinkRequested`, and `ReaderError`, including object and JSON input.
+- Reader bridge malformed events: unknown type, malformed JSON, invalid Relocated progress/CFI, empty selection fields, empty search-result CFI, invalid external URL, and empty ReaderError fields rejected.
+- Focused result: `2` suites, `20` tests, `20` passed, `0` failures, `0` skipped, exit code `0`.
+
+### TEST-031
+
+- Status: `PASS`.
+- Cache hit: definition returned with `cached=true`; `fetch` and cache write are not called.
+- Network success: mocked Wiktionary response is sanitized, returned with `cached=false`, and written to cache.
+- URL contract: normalized language hostname, `/w/api.php`, and required OUT-001 query parameters are asserted structurally.
+- Normalization: trim, repeated whitespace, lowercase cache key, `pt-BR`/`en-US`, and undefined-language fallback to `pt` covered.
+- Non-2xx response and missing/empty page reject without cache writes.
+- Cache write/expiry: normalized record and the implemented 30-day expiry are asserted with fake timers.
+- External network: `NO`; `global.fetch` is mocked for every scenario.
+- Focused result: `1` suite, `10` tests, `10` passed, `0` failures, `0` skipped, exit code `0`.
+
+### TEST-037
+
+- Status: `PASS`.
+- Insert: existing parameterized annotation insert coverage preserved, including apostrophes.
+- List: `book_id = ?` filtering, parameter binding, row mapping, and empty result are covered.
+- Update: `UPDATE ... WHERE id = ?` uses separated parameters and does not insert.
+- Delete: `DELETE FROM annotations WHERE id = ?` uses a separated parameter.
+- Nonexistent IDs: update/delete resolve normally with zero affected rows and no compensating insert or spurious data.
+- Focused result: `1` suite, `7` tests, `7` passed, `0` failures, `0` skipped, exit code `0`.
+
+### Wave 4B regression
+
+- `npm run typecheck`: `PASS`, exit code `0`.
+- Full Jest: `11` suites, `95` tests, `95` passed, `0` failures, `0` skipped, exit code `0`; Jest duration `6.962s`.
+- Focused Wave 4B command: `5` suites, `41` tests, `41` passed, `0` failures, `0` skipped, exit code `0`; Jest duration `4.488s`.
+- TEST-018: `PASS` preserved from Wave 4A.
+- TEST-050: `PASS` preserved from Wave 4A.
+- TEST IDs promoted in this section: `TEST-012`, `TEST-026`, `TEST-031`, `TEST-037` only.
+- TEST-035, TEST-049, Android/device/emulator, and Wave 5 were not executed.
+- `PRODUCT_BUG_CANDIDATE`: none.
+- `TEST_INFRASTRUCTURE`: none.
+- Production files changed: `NONE`.
