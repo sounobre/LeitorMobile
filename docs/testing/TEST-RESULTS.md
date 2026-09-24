@@ -1279,3 +1279,17 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Wave 4: `8/8 PASS`, `0 FAIL`, `0 BLOCKED`.
 - Status: `COMPLETE`.
 - Recommendation: `WAVE 4 COMPLETE — MERGE SAFE` after final verification and the separate GREEN commit. No push, merge, Android/device/emulator, or Wave 5 work in this task.
+
+## Wave 5A — Mobile E2E tool decision spike
+
+- Status: TOOL_DECISION_BLOCKED_DEVICE / DEVICE_ENVIRONMENT_BLOCKED; Selected: UNRESOLVED. Appium UiAutomator2 is the first candidate for a future practical proof, not a selected harness.
+- Base: origin/main b091fef69224c7108eb96ecd9dd6ffb6d9716ad8; isolated branch test/wave-5a-mobile-e2e-tool-spike.
+- Environment: Windows NT 10.0.26200.0; Node v26.8.1; npm 11.19.0; Java 21.0.6; Android SDK C:\Users\souno\AppData\Local\Android\Sdk; adb 1.0.41 / platform-tools 37.0.0. ANDROID_HOME and ANDROID_SDK_ROOT point to that SDK. sdkmanager --list_installed attempted an Android CLI download and was cancelled; directory inventory found platforms 35/36/36.1 and images 34/36/37.0, but no API 29 image.
+- Emulator/device: emulator -list-avds returned Pixel_8 (configured for API 37). adb devices and adb devices -l returned no usable target; no emulator was booted and no physical device was authorized for the spike.
+- App/build: Expo ~57.0.20, RN 0.86.3, React 19.2.3, Expo Router, expo-dev-client and EAS development profile configured. android/ and a local APK absent. No build, prebuild, install or app launch was performed.
+- Tools analyzed: Maestro PARTIAL (Windows CLI and artifacts documented; Reader WebView accessibility uncertain), Detox UNPROVEN (RN 0.86 beyond officially verified New Architecture range, Expo integration community-driven, native Gradle/test build required), Appium UiAutomator2 PARTIAL (documented native/WebView/system UI and API >=26 capabilities; actual app unproved; server/driver/client cost).
+- Tool proved: NONE. Practical install, launch, navigation, screenshot, logs and Reader WebView/Document Picker interaction: NOT_RUN. No E2E result inferred from documentation.
+- Limitations/decision: no connected target or development APK; no automatic android/ generation allowed in this spike. Documented comparison, 22-criterion assessment, evidence and future proof steps are in MOBILE-E2E-TOOL-DECISION.md. Playwright remains suitable for Wave 3 WEB only and is not a native Wave 5 candidate.
+- TEST IDs executed: NONE. TEST-004, TEST-011, TEST-017, TEST-019, TEST-022, TEST-025, TEST-030, TEST-032, TEST-033, TEST-034, TEST-036, TEST-038, TEST-043, TEST-048, TEST-051, TEST-052 and TEST-053 remain NOT_RUN.
+- Production files changed: NONE. Dependencies changed: NONE. TEST-MATRIX unchanged.
+- Recommendation: BLOCKED — DEVICE/TOOL DECISION REQUIRED; perform one Appium smoke against a booted target and development APK before Wave 5 implementation.
