@@ -1227,3 +1227,24 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Production files changed: leitor-epub/src/services/backup.ts only.
 - TEST IDs altered in Wave 4C: TEST-049 only.
 - Recommendation: MERGE SAFE after final verification and selective fix commit.
+
+## Wave 4D — Mobile card creation component contract
+
+### TEST-035
+
+- Status: `FAIL` — `PRODUCT_BUG_CANDIDATE` in the blank-term creation boundary. Wave 4 remains open.
+- Base: `origin/main` / `5029d31234531039758825d8a599b6ee7ce32a2c`; branch `test/wave-4d-mobile-card-contract`.
+- Component owner: default route component in `leitor-epub/app/reader/[id].tsx` (`ReaderRoute` loads the book; `ReaderExperience` owns `handleSelectionAction` and `saveCard`). The test invokes `onSelectionAction('card', selection)` on the rendered `EpubReaderSurface` mock. It does not call or copy `saveCard`, and it does not test the library `BookCard`.
+- Harness: `leitor-epub/src/components/readerCardCreation.test.ts`, Jest Expo and `react-test-renderer` 19.2.3 resolved from the existing lockfile after `npm ci --offline`; no dependency or lockfile changes. The surface mock is a React `forwardRef` component with `clearSelection()`. Repository loading/insertion and prepared lexical lookup are controlled; `cardFieldsFromLexicon` is real. Visual dialogs and native integrations are isolated. Device/emulator: `NO`. External network during install and tests: `NO`.
+- Baseline before edits: `npm run typecheck` PASS; `npm test -- --runInBand` 11 suites, 100 tests, 100 passed, 0 failures, 0 skipped; Jest duration `15.422 s`.
+- Valid lexical card: `getBook(db, 'book-035')` returns the synthetic book. The component calls `lookupPreparedLexicon(db, 'book-035', 'dragon')`, then `appendCard` exactly once. The record has id `card-035`, bookId `book-035`, selectedText `dragon`, CFI `epubcfi(/6/2!/4/2/2:0)`, translation `dragão`, pronunciation `ˈdræɡən`, partOfSpeech `noun`, definition `a mythical creature`, background `''`, empty examples/relatedWords, chapterTitle `Chapter One`, and createdAt/updatedAt `2026-09-24T12:00:00.000Z`. Snackbar confirms `Card salvo com os dados do dicionário local.`. No assertion depends on queueOrder.
+- No lexical data: `lookupPreparedLexicon` resolves null for valid `moonspire`; `appendCard` is called once with empty translation, pronunciation, partOfSpeech, and definition. Snackbar confirms `Card salvo. O dicionário local não encontrou tradução ou definição para este trecho.`. This is a positive CAP-017 alternative.
+- Lexical lookup failure: synthetic rejection is caught; `appendCard` is called once with empty lexical fields and success state. No card error is invented.
+- Missing book: route id `missing-book`, `getBook` returns null; `ReaderExperience` / mocked surface is not mounted, lookup and append are not called, and the displayed state is `Livro não encontrado na biblioteca.`.
+- Persistence/FK failure: `appendCard` rejects `FOREIGN KEY constraint failed`; exactly one append attempt, no retry, no success confirmation, and Snackbar shows `Não foi possível salvar o card.`. The component harness observes no partial success; it does not claim a real SQLite transaction test.
+- Blank term: `EpubReaderSurface` forwards the menu's raw `text` and CFI; neither `handleSelectionAction` nor `saveCard` guards `text.trim().length === 0`. With `text = '   '` and valid CFI, `appendCard` is called once with `selectedText = '   '`, bookId `book-035`, and id `card-035`. The assertion requiring no append fails. The lookup mock returns null; lexical absence is not the cause of this failure. Classification: `PRODUCT_BUG_CANDIDATE`.
+- Missing card-id scenario: not applicable to CAP-017 creation; `Crypto.randomUUID()` generates the card id. Input card-id absence belongs to update/archive flows (CAP-018).
+- Focused command: `npm test -- --runInBand src/components/readerCardCreation.test.ts src/services/lexicon.test.ts`; 2 suites (1 passed, 1 failed), 8 tests (7 passed, 1 failed), 0 skipped; Jest duration `4.624 s`; exit code 1. The sole failure is the blank-term no-append assertion. Post-edit `npm run typecheck`: PASS.
+- Full post-edit regression: not run after the focused RED result, as instructed for a confirmed blank-term bug. No Wave 4 closure entry was added. The seven previously completed Wave 4 IDs remain PASS from the remote base; TEST-035 is FAIL (7/8 PASS, 1 FAIL, 0 BLOCKED).
+- `TEST_INFRASTRUCTURE`: none remaining. A fresh worktree required installing the existing lockfile offline before the renderer could resolve; an initial test import path typo was corrected before the final focused run.
+- Production files changed: `NONE`. TEST IDs altered in this execution: `TEST-035` only. Recommendation: `DO NOT MERGE — bug fix required`; preserve this RED test and address the blank-term guard in a separate TDD task. No push, merge, device run, or Wave 5 work.
