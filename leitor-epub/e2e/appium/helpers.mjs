@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { writeFile } from 'node:fs/promises';
 
 const DEFAULT_APPIUM_URL = 'http://127.0.0.1:4723';
