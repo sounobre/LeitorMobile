@@ -198,6 +198,14 @@ describe('TEST-035 — contrato de criação de card mobile', () => {
     expect(snackbar().props).toMatchObject({ visible: true, children: 'Card salvo com os dados do dicionário local.' });
   });
 
+  it('preserva espaços de uma seleção válida no lookup e no card', async () => {
+    await renderReader();
+    await chooseCard({ ...selection, text: ' dragon ' });
+
+    expect(lookupMock).toHaveBeenCalledWith(db, book.id, ' dragon ');
+    expect(insertedCard().selectedText).toBe(' dragon ');
+  });
+
   it('cria card com campos lexicais vazios quando o léxico não encontra o termo', async () => {
     lookupMock.mockResolvedValue(null);
     await renderReader();

@@ -314,6 +314,7 @@ function ReaderExperience({
     }
   }, [book.language]);
   const saveCard = useCallback(async (selected: SelectionPayload) => {
+    if (!selected.text.trim()) return;
     const prepared = await lookupPreparedLexicon(db, book.id, selected.text).catch(() => null);
     const lexicalFields = cardFieldsFromLexicon(prepared);
     const now = new Date().toISOString();

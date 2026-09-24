@@ -1248,3 +1248,34 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Full post-edit regression: not run after the focused RED result, as instructed for a confirmed blank-term bug. No Wave 4 closure entry was added. The seven previously completed Wave 4 IDs remain PASS from the remote base; TEST-035 is FAIL (7/8 PASS, 1 FAIL, 0 BLOCKED).
 - `TEST_INFRASTRUCTURE`: none remaining. A fresh worktree required installing the existing lockfile offline before the renderer could resolve; an initial test import path typo was corrected before the final focused run.
 - Production files changed: `NONE`. TEST IDs altered in this execution: `TEST-035` only. Recommendation: `DO NOT MERGE — bug fix required`; preserve this RED test and address the blank-term guard in a separate TDD task. No push, merge, device run, or Wave 5 work.
+
+## TEST-035 confirmed bug — blank mobile card selection TDD fix
+
+- Root cause: `saveCard` accepted `selected.text` containing only whitespace and forwarded the original value to `lookupPreparedLexicon` and `appendCard`. `EpubReaderSurface` forwards the raw menu selection, and `handleSelectionAction` had no blank-term guard.
+- RED: the isolated blank-selection case failed before the production edit. With `text = '   '`, `appendCard` received one `CardRecord` containing `selectedText = '   '`; the repository boundary was reached. The deliberate RED commit is `c067d4d7abea3334a7f6ad0fb5f706dd00a35885` (`test(mobile): reproduce blank card selection bug`).
+- Production fix: one early `if (!selected.text.trim()) return;` guard at the beginning of `saveCard` in `leitor-epub/app/reader/[id].tsx`. Valid selections still pass their original `selected.text` to both lookup and `CardRecord.selectedText`; a separate positive component case confirms `' dragon '` stays unchanged.
+- GREEN: the same blank-selection component case now has zero `lookupPreparedLexicon` calls, zero `appendCard` calls, no `CardRecord` passed to persistence, and no success Snackbar. No new UX message was introduced.
+- TEST-035 cases: valid lexical card PASS (one append and expected lexical fields, chapter, CFI, timestamps, and success state); no lexical data PASS (card created with empty lexical fields); lexical lookup failure PASS (card created with empty lexical fields); missing book PASS (reader surface not mounted, no append, existing missing-book state); persistence/FK failure PASS (one append attempt, no retry or partial success confirmation, existing generic error); blank term PASS (zero lookup/append/success).
+- Missing card-id: `NOT APPLICABLE` to creation; `Crypto.randomUUID()` generates the id. Blank CFI validation is outside this fix; no CFI rule was added.
+- Focused GREEN command: `npm test -- --runInBand src/components/readerCardCreation.test.ts src/services/lexicon.test.ts`; 2 suites, 9 tests, 9 passed, 0 failed, 0 skipped; Jest duration `4.372 s`.
+- Typecheck: `npm run typecheck` PASS. Full mobile regression: `npm test -- --runInBand`; 12 suites, 107 tests, 107 passed, 0 failed, 0 skipped; Jest duration `8.323 s`.
+- Final verification rerun before the GREEN commit: `npm run typecheck` PASS; focused 2 suites/9 tests/9 passed/0 failed/0 skipped in `3.901 s`; full mobile regression 12 suites/107 tests/107 passed/0 failed/0 skipped in `8.756 s`.
+- `PRODUCT_BUG` blank card selection: `CONFIRMED → FIXED`. TEST-035 historical detection: `FAIL`; final status: `PASS`. The seven previously passing Wave 4 IDs remained green in the full mobile regression.
+- Code review: guard is at the creation boundary; blank text reaches neither lookup nor append; valid text is not trimmed; lexical absence and persistence error paths remain intact; no new message, CFI rule, device work, network call, or unrelated production change. Production file changed: `leitor-epub/app/reader/[id].tsx` only. TEST IDs altered: `TEST-035` only.
+
+## Wave 4 — Closure
+
+| TEST ID | Final status |
+|---|---|
+| TEST-012 | PASS |
+| TEST-018 | PASS |
+| TEST-026 | PASS |
+| TEST-031 | PASS |
+| TEST-035 | PASS |
+| TEST-037 | PASS |
+| TEST-049 | PASS |
+| TEST-050 | PASS |
+
+- Wave 4: `8/8 PASS`, `0 FAIL`, `0 BLOCKED`.
+- Status: `COMPLETE`.
+- Recommendation: `WAVE 4 COMPLETE — MERGE SAFE` after final verification and the separate GREEN commit. No push, merge, Android/device/emulator, or Wave 5 work in this task.
