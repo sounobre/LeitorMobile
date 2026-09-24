@@ -174,6 +174,21 @@ describe('TEST-035 — contrato de criação de card mobile', () => {
     jest.useRealTimers();
   });
 
+  it('Wave 5F — não renderiza texto direto no View raiz de ReaderExperience', async () => {
+    const root = (await renderReader()).toJSON();
+    if (!root || Array.isArray(root)) {
+      throw new Error('ReaderExperience deve renderizar um único View raiz.');
+    }
+
+    expect(root.type).toBe('View');
+    const children = root.children ?? [];
+    expect(children).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'MockEpubReaderSurface' }),
+    ]));
+    // Whitespace-only strings are also invalid children of a native View.
+    expect(children.filter((child) => typeof child === 'string' && child.length > 0)).toEqual([]);
+  });
+
   it('cria card válido com campos lexicais e confirma sucesso', async () => {
     await renderReader();
     await chooseCard(selection);
