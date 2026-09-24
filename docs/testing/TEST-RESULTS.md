@@ -1334,3 +1334,39 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Evidence: page sources, screenshots, Appium logs, fake API log, Metro log and logcat remain temporarily outside Git under `%TEMP%\wave-5d-appium-smoke\`. `android/` is generated/ignored and not committed. Production files changed `NONE`; `package.json` unchanged; `package-lock.json` unchanged; no new dependency.
 - TEST IDs executed: **NONE**. All 17 Wave 5 IDs remain `NOT_RUN`: TEST-004, TEST-011, TEST-017, TEST-019, TEST-022, TEST-025, TEST-030, TEST-032, TEST-033, TEST-034, TEST-036, TEST-038, TEST-043, TEST-048, TEST-051, TEST-052 and TEST-053. Specifically, synthetic login is not TEST-004; the library observation is not TEST-011; the picker observation is not TEST-017; and opening Cards is not TEST-043. TEST-MATRIX unchanged.
 - Next: `READY TO IMPLEMENT WAVE 5 GROUP A`. Appium was selected as the harness; Group A itself was not started in this task.
+
+
+## Wave 5E — Group A mobile E2E
+
+- Outcome: `FAIL` — Group A incomplete; stopped at the first product runtime error as required. Base: `origin/main` / `95f270eb246c23d50ce8610139e1a3b0ca017c87`; branch `test/wave-5e-group-a-mobile-core`; short worktree `D:\LM5E`.
+- Environment: Pixel_8 / `emulator-5554` / API 37 / x86_64, boot completed. Debug development APK built and installed: `D:\LM5E\leitor-epub\android\app\build\outputs\apk\debug\app-debug.apk` (148,923,547 bytes). Metro loaded `expo-router/entry.js`; Appium `3.7.0`, UiAutomator2 `8.7.0`; W3C session created with the requested app/device capabilities. API 29 was not installed or started.
+- Harness: versioned standard-library W3C Appium helpers, strict fake API and deterministic EPUB2/EPUB3 fixture generator under `leitor-epub/e2e/appium/`; no project dependency added. Dev Client startup uses its observed server screen and Continue/Dev Menu sequence. Input helpers clear actual field values before setting them.
+- JS baseline before device execution: `npm run typecheck` PASS; `npm run lint` exit 0 (0 errors, 14 warnings); Jest 13 suites / 109 tests / 109 PASS. Harness checks after its edits: `node --test e2e/appium/helpers.test.mjs`, 3 tests / 3 PASS. Full project regression was not rerun after the device blocker, following the stop-on-product-bug rule. `package.json` and `package-lock.json` hashes stayed at the baseline values; neither changed.
+
+### TEST-004 — PASS
+
+- Synthetic login was entered through Appium in the product login screen. The UI navigated to `Leitor EPUB`.
+- The fake API received exactly `POST /api/auth/login` (200), then `GET /api/books` (200) and `GET /api/cards?includeArchived=true` (200). No unexpected requests. Initial sync is recorded separately from the login verdict.
+- The fake API was stopped; the app was force-stopped and relaunched. The local library screen appeared without returning to login and with no fake server available.
+- Read-only copy of `files/SQLite/leitor-epub.db` passed `PRAGMA integrity_check` (`ok`) and contained one `sync_session` row with `wave5@example.invalid` and `http://127.0.0.1:18080/api`. The token was not selected or recorded.
+
+### TEST-017 — FAIL (EPUB2 path reached Reader; EPUB3 not attempted)
+
+- The product's `Importar livro EPUB` action opened DocumentsUI. Appium selected the synthetic `wave5-epub2.epub` from Downloads; its metadata was Wave Five EPUB Two / Author Two.
+- Evidence after the product import: one private EPUB at `files/books/c9c0a5a1-8bb0-4503-90dc-5432587ecb68.epub`; one SQLite `books` row with non-empty SHA-256 `10f9edd2d1d454c3b6f207aaf0539c5ab0ae35d3a42d78db45c28b197909019c`, local `file_uri`, and `cover_uri=null`. Read-only DB integrity was `ok`.
+- The Appium hierarchy at the Reader route contained `EPUB.js`, `Wave Five EPUB Two`, and the React Native render error `Text strings must be rendered within a <Text> component.` Logcat for the app's ReactNativeJS process recorded the same error. The app process remained alive when evidence was captured. Back did not establish a return to the library; the run stopped here. EPUB3 import, two-book library visibility, cover/placeholder observation and further reader interaction were not attempted.
+- Verdict is `FAIL`, not a Reader/WebView compatibility result: the acceptance path exposed a product runtime error immediately on the route opened by import. No production fix was made.
+
+- TEST IDs executed: `TEST-004` (`PASS`) and `TEST-017` (`FAIL`, stopped during its EPUB2 path). No TEST ID outside the five authorized IDs was executed.
+
+### TEST-011, TEST-019 and TEST-022 — BLOCKED / NOT RUN
+
+- Execution stopped at the TEST-017 product runtime error. Offline filters, duplicate import, partial-failure injection and delete/cancel scenarios were not attempted. No SQLite trigger was created and no additional EPUB was imported.
+- TEST-025, TEST-030, TEST-032, TEST-033, TEST-034, TEST-036, TEST-038, TEST-043, TEST-048, TEST-051, TEST-052 and TEST-053 remain `NOT_RUN`. No API 29 test was run. `TEST-MATRIX.md` was not changed.
+
+- `PRODUCT_BUG_CANDIDATE`: opening `/reader/[id]` for the imported EPUB2 displays a React Native render error (`Text strings must be rendered within a <Text> component.`). Root cause is not established in this execution; production diagnosis/fix must be separate.
+- `TEST_EXPECTATION_ERROR`: none observed. The EPUB2 imported successfully through validation, storage and SQLite registration; the failure was the runtime error in the opened product route.
+- `TEST_INFRASTRUCTURE`: startup Dev Client handling, W3C field clearing, Windows shell quoting, and the actual SQLite path were characterized in the versioned harness. The observed product failure is preserved; no product workaround was added.
+- Artifacts remain outside Git under `%TEMP%\wave-5e-group-a\`: Appium/Metro/fake API logs, page sources, screenshots, filtered logcat, fixture files, private file listing and read-only SQLite copies. Key Reader evidence: `page-sources/test-017-epub2-reader-route.xml`, `screenshots/test-017-epub2-reader-route.png`, `logcat/test-017-reader-runtime-error.txt`, and `sqlite/test-017-after-reader-error/`.
+- Production files changed: `NONE`. `package.json`: `NO`; `package-lock.json`: `NO`; generated `android/` and APK: temporary/ignored; TEST-MATRIX unchanged. No Group A completion claim.
+- Recommendation: `DO NOT MERGE — PRODUCT BUG FOUND`; fix the Reader render error separately, then resume Group A from a clean app state. TEST-011/019/022 remain unexecuted.
