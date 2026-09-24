@@ -630,7 +630,14 @@ function ReaderExperience({
           }}
           onDismiss={() => setLookup(null)}
         />
-      ) : null}      <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={4500}>{message}</Snackbar>
+      ) : null}
+      <Snackbar
+        visible={Boolean(message)}
+        onDismiss={() => setMessage('')}
+        duration={4500}
+      >
+        {message}
+      </Snackbar>
     </View>
   );
 }

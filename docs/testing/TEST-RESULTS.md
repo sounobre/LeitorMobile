@@ -1370,3 +1370,61 @@ Depois, a execução deverá configurar DATABASE_URL para jdbc:postgresql://127.
 - Artifacts remain outside Git under `%TEMP%\wave-5e-group-a\`: Appium/Metro/fake API logs, page sources, screenshots, filtered logcat, fixture files, private file listing and read-only SQLite copies. Key Reader evidence: `page-sources/test-017-epub2-reader-route.xml`, `screenshots/test-017-epub2-reader-route.png`, `logcat/test-017-reader-runtime-error.txt`, and `sqlite/test-017-after-reader-error/`.
 - Production files changed: `NONE`. `package.json`: `NO`; `package-lock.json`: `NO`; generated `android/` and APK: temporary/ignored; TEST-MATRIX unchanged. No Group A completion claim.
 - Recommendation: `DO NOT MERGE — PRODUCT BUG FOUND`; fix the Reader render error separately, then resume Group A from a clean app state. TEST-011/019/022 remain unexecuted.
+
+## Wave 5F — Reader raw-text runtime blocker
+
+- Outcome: `PASS` for the Reader runtime blocker; required Android gate completed. Full-repository lint remains `FAIL` for the same pre-existing harness errors reported below; this is not an all-checks-green claim.
+- Base: fetched `origin/main` = `bd32038bf8bfa284bb3f19043219184ba395f18a`. Branch `fix/mobile-reader-text-node`; short worktree `D:\LM5F`; initial `git status --short` empty. Fetch used process-only `http.sslBackend=schannel` after the default certificate backend failed, with TLS verification retained.
+- Scope: `TEST-017 diagnostic continuation only`. TEST-011/019/022, TEST-025 and Group B were not executed. No EPUB3 import, API 29 install, dependency addition/update, push or merge. TEST-MATRIX unchanged.
+
+### Original RED and boundary isolation
+
+- Historical TEST-017 remains `FAIL`: Wave 5E had already selected the valid EPUB2, written the private file, registered the SQLite row, and opened `/reader/[id]` before the text-render error. Import validation/storage was not the starting investigation.
+- Fixture reused unchanged: `wave5-epub2.epub`, title `Wave Five EPUB Two`, author `Author Two`, SHA-256 `10f9edd2d1d454c3b6f207aaf0539c5ab0ae35d3a42d78db45c28b197909019c`.
+- Fresh runtime RED: synthetic product login -> library -> `Importar livro EPUB` -> DocumentsUI -> select only EPUB2 -> Reader. ReactNativeJS and Metro emitted `Text strings must be rendered within a <Text> component.`. After reopening the persisted fixture, Appium captured the title, Back/search controls, loading state and the exact error toast together. The RED screenshot/source are preserved; the observed toast is not misreported as a full `Render Error` overlay.
+- Full component stack emitted by Metro (all available application frames; no additional frames in the captured logcat/hierarchy):
+
+```text
+ReaderExperience (app\reader\[id].tsx:481:5)
+ReaderRoute (app\reader\[id].tsx:143:5)
+AuthGate (app\_layout.tsx:73:5)
+RootLayout (app\_layout.tsx:30:17)
+```
+
+- Metro highlights the root `<View>` at line 481. ReactNativeJS logcat supplies the message without a component stack.
+- Temporary experiment A replaced only the `<EpubReaderSurface ... />` element with `<View />`, preserving the rest of ReaderExperience. Result: the same raw-text error, including the root View stack, remained. The captured title was hidden by the chrome timer, so the diagnostic JSON's title-only `readerReached` field was false; the ReaderExperience stack establishes the boundary. Experiment A was fully reverted and its diff was checked empty before the next experiment.
+- Temporary whitespace-only experiment restored the real EpubReaderSurface and changed only `) : null}      <Snackbar` to a newline before `<Snackbar>`. Result: no raw-text error, Reader title and `Pesquisar no livro` in the Appium hierarchy, and normal Appium Back returned to `Leitor EPUB` with `Wave Five EPUB Two`. This confirmed the whitespace hypothesis. The temporary edit was then reverted before the unit RED commit.
+- Diagnosis infrastructure notes: DocumentsUI required waiting for its file list; Android's first full-screen hint was dismissed. One initial RED capture encountered an ANR and the app process was restarted without wiping/restarting the AVD. An early whitespace attempt captured the library row before Reader navigation and was not accepted as GREEN. The temporary diagnostic subsequently required Reader-specific evidence and configured Appium's idle wait to 0. Versioned Group A harness files were not modified.
+
+### Root cause, regression and minimal fix
+
+- Confirmed cause: the six same-line spaces between the lookup conditional and Snackbar were meaningful JSXText. They became a direct string child (`"      "`) of the native root View, which requires text to be wrapped in Text. The accidental node was removed, not wrapped or hidden.
+- Regression: `leitor-epub/src/components/readerCardCreation.test.ts`, test `Wave 5F — não renderiza texto direto no View raiz de ReaderExperience`. It reuses the controlled useReader, mocked surface/dialogs and renderer setup; requires one root native View and a direct mocked surface to exclude the loading branch; rejects any direct nonempty string, including whitespace. No parser/dependency or AST fallback was needed.
+- Unit RED with original production JSX: focused command `npm test -- --runInBand src/components/readerCardCreation.test.ts -t "Wave 5F"`; 1 failure, 7 skipped, exit 1, 3.317 s. Assertion expected `[]` and received `["      "]`. Test-only RED commit: `b002a34` (`test(mobile): reproduce Reader raw text node`).
+- Production fix: only `leitor-epub/app/reader/[id].tsx`; newline before Snackbar and multiline formatting of its unchanged `visible`, `onDismiss`, `duration={4500}` and `{message}`. No Reader behavior, EpubReaderSurface, core, dependency or harness change.
+- Scan of Reader JSX and TypeScript AST: `no additional direct raw text found`. The percent sign is inside Text. No stray punctuation or other meaningful direct JSXText was found in View/Surface/Animated.View.
+- Focused GREEN: same command, 1 passed, 7 skipped, exit 0, 3.066 s. Independent review found no code blockers or scope violations.
+
+### JavaScript verification — actual results
+
+- `npm ci --prefer-offline`: exit 0; existing lockfile used, 1098 packages installed; existing core 1.4.7 patch applied. package.json and package-lock.json unchanged.
+- Baseline typecheck: PASS, exit 0. Initial baseline Jest: 13 suites, 108 passed/1 failed of 109; the first existing valid-card case exceeded its 5000 ms timeout. Immediate unchanged rerun: 13 suites/109 tests/109 PASS, 0 failures, 0 skipped, exit 0, 10.679 s.
+- Baseline and final `npm run lint`: FAIL, exit 1, identical 12 `Buffer is not defined` errors (`generate-epub-fixtures.mjs`: 11; `helpers.mjs`: 1) and 14 existing warnings. These errors already exist at the fetched base, in files outside this fix; they were not silently repaired or excluded.
+- Final `npm run typecheck`: PASS, exit 0.
+- Final `npm test -- --runInBand`: 13 suites, 110 tests, 110 PASS, 0 failures, 0 skipped, exit 0, 6.029 s.
+- Baseline and final `node --test e2e/appium/helpers.test.mjs`: 3 tests/3 PASS, 0 failures, 0 skipped, exit 0.
+- Changed-file ESLint check: exit 0, 0 errors, 2 existing require-import warnings in the component test. No new lint error introduced.
+
+### Android GREEN and return to library
+
+- Device: Pixel_8, emulator-5554, API 37 / x86_64. Reused and successfully reinstalled the Wave 5E development APK `D:\LM5E\leitor-epub\android\app\build\outputs\apk\debug\app-debug.apk` (148,923,547 bytes; SHA-256 `065bddae9a70675d1fb883eccf747f209ae891a901b69ca228a725c7e2513a20`). Native config, modules, manifests, lockfile and patches match the base; the permanent JS fix was served by Metro from `D:\LM5F\leitor-epub`.
+- Final flow started from clean synthetic app data: login -> library -> product Importar livro EPUB -> DocumentsUI -> select `wave5-epub2.epub` -> Reader. The fake API observed only login and the two initial sync endpoints; no EPUB3 was imported.
+- The initial final-run 60-second Reader wait timed out; its captured hierarchy already showed EPUB.js, the title and synthetic chapter text without an error. This timeout was not treated as success by itself. A diagnostic continuation of that same import captured the healthy Reader again and completed normal Back; no second import or deep reader interaction was needed.
+- `Reader route healthy = YES`. Final Appium hierarchy contains `EPUB.js`, `Wave Five EPUB Two` and the fixture chapter text. The earlier whitespace-only confirmation also captured native Back, bookmark and `Pesquisar no livro`; bottom page/settings controls were not visible in that capture and are not claimed as tested.
+- Final Reader/library hierarchies and fresh final logcat/Metro segment: 0 `Text strings must be rendered`, 0 `Render Error`, 0 `FATAL EXCEPTION`.
+- Contexts recorded only: `NATIVE_APP`, `WEBVIEW_com.example.leitorepub`. No context switch, Chromedriver investigation, WebView spike or TEST-025 execution; WEBVIEW availability was not a closure gate.
+- Normal Appium Back returned to the product library. Hierarchy contains `Leitor EPUB`, `Buscar na biblioteca` and `Wave Five EPUB Two`; screenshot and source saved.
+- Evidence outside Git: `%TEMP%\wave-5f-reader-text\`. Key RED: `screenshots/red-reader.png`, `page-sources/red-reader.xml`, `logcat/red-reader.txt`, `red-metro.stdout.log`. Isolation: `isolation-a.patch`, `isolation-a-result.json`, `page-sources/isolation-a-reader.xml`, `isolation-a-metro.stdout.log`. Hypothesis: `whitespace-only.patch`, `whitespace-confirm-result.json` and corresponding screenshots/source/logcat. Permanent GREEN: `green-result.json`, `screenshots/green-reader.png`, `page-sources/green-reader.xml`, `screenshots/green-library-return.png`, `page-sources/green-library-return.xml`, `logcat/green-final.txt`, `green-metro.stdout.log`, `green-metro.stderr.log`. Baseline/focused/final JS logs and temporary diagnostic scripts are preserved there too.
+- TEST-017 final acceptance verdict: **REMAINS FAIL/PENDING FULL RERUN**. This diagnostic fixes the blocker only; TEST-017 requires its full Group A rerun before promotion.
+- Production files changed: only `leitor-epub/app/reader/[id].tsx`. Other changed files: the component regression and this TEST-RESULTS entry. Dependencies (including core 1.4.7), EpubReaderSurface and Group A harness unchanged.
+- Recommendation: **READY TO RESUME GROUP A**, with the pre-existing repository lint failure explicitly retained. Group A was not resumed in this task.
