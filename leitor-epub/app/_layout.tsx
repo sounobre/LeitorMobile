@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { ReaderProvider } from '@epubjs-react-native/core';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -40,31 +40,34 @@ export default function RootLayout() {
 function AuthGate() {
   const db = useSQLiteContext();
   const router = useRouter();
+  const routerRef = useRef(router);
   const segments = useSegments();
   const inLogin = segments[0] === 'login';
   const [lastAuthCheck, setLastAuthCheck] = useState<{
     db: unknown;
     inLogin: boolean;
-    router: unknown;
   } | null>(null);
-  const ready = lastAuthCheck?.db === db
-    && lastAuthCheck.inLogin === inLogin
-    && lastAuthCheck.router === router;
+  const hasAuthCheckForDb = lastAuthCheck?.db === db;
+
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
     void getSession(db).then((session) => {
       if (cancelled) return;
-      setLastAuthCheck({ db, inLogin, router });
-      if (!session && !inLogin) router.replace('/login');
-      if (session && inLogin) router.replace('/');
+      setLastAuthCheck({ db, inLogin });
+      if (!session && !inLogin) routerRef.current.replace('/login');
+      if (session && inLogin) routerRef.current.replace('/');
     });
     return () => {
       cancelled = true;
     };
-  }, [db, inLogin, router]);
+  }, [db, inLogin]);
 
-  if (!ready) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
+  // Keep Stack mounted for route rechecks; removing it resets Expo Router.
+  if (!hasAuthCheckForDb) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
