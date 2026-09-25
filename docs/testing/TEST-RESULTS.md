@@ -1428,3 +1428,37 @@ RootLayout (app\_layout.tsx:30:17)
 - TEST-017 final acceptance verdict: **REMAINS FAIL/PENDING FULL RERUN**. This diagnostic fixes the blocker only; TEST-017 requires its full Group A rerun before promotion.
 - Production files changed: only `leitor-epub/app/reader/[id].tsx`. Other changed files: the component regression and this TEST-RESULTS entry. Dependencies (including core 1.4.7), EpubReaderSurface and Group A harness unchanged.
 - Recommendation: **READY TO RESUME GROUP A**, with the pre-existing repository lint failure explicitly retained. Group A was not resumed in this task.
+
+## Wave 5H — Group A resume
+
+- Wave status: `FAIL`; Group A status: `INCOMPLETE`. TEST-017 encountered a clean-run EPUB2 Reader display failure and was classified `PRODUCT_BUG_CANDIDATE`; execution stopped before TEST-017 EPUB3 and before TEST-011/019/022.
+- Base: fetched `origin/main` and worktree HEAD `0a89f36826a13817ac00d4330d81afd7334593e1`. Branch `test/wave-5h-resume-group-a`; short worktree `D:\LM5H`.
+- Scope: only the authorized Group A resume IDs were in scope. TEST-004 remains historical `PASS`; synthetic login was used only as setup and did not receive a new verdict. No forbidden TEST ID was executed and API 29 was not installed or run.
+- JavaScript baseline before device execution: `npm ci --prefer-offline` passed; `npm run typecheck` passed; `npm run lint` reported 0 errors and 14 existing warnings; Jest passed 13 suites / 110 tests / 110 passed / 0 failed; `node --test e2e/appium/helpers.test.mjs` passed 3/3.
+- Device/build: Pixel_8 `emulator-5554`, Android API 37, booted. Temporary Expo Android prebuild and x86_64 debug build completed and the APK was installed. Appium 3.7.0 with UiAutomator2 8.7.0; Metro served `expo-router/entry.js` with the process-only system CA setting and reverse ports 8081/18080. Generated `android/` and APK remain temporary/ignored.
+- Setup: synthetic login `wave5@example.invalid` succeeded; fake API observed `POST /api/auth/login`, `GET /api/books`, and `GET /api/cards?includeArchived=true`. The library was empty before import. This is setup evidence only; TEST-004 verdict was not changed.
+
+### TEST-017 — FAIL / PRODUCT_BUG_CANDIDATE
+
+- The real DocumentsUI picker selected `wave5-epub2.epub`. The private file was written and a read-only SQLite copy contained exactly one row for `Wave Five EPUB Two`, with a non-empty SHA-256, local `file_uri`, `cover_uri = null`, and `PRAGMA integrity_check = ok`. The private-files listing correlated the row to one EPUB under `files/books/` and no cover for EPUB2.
+- In the latest clean attempt, the Reader route remained visually blank after the 65-second observation window; the preserved screenshot contains neither the expected title nor chapter. Normal Android Back returned to the library and the EPUB2 row remained visible. The previous diagnostic attempt had a hierarchy containing the title and chapter for EPUB2, so Reader behavior was inconsistent across attempts; this latest clean-run failure is retained as a candidate and is not presented as a confirmed root cause.
+- Logcat/Metro and the captured run showed 0 occurrences of `Maximum update depth exceeded`, `Text strings must be rendered`, `Render Error`, and `FATAL EXCEPTION`. Absence of these runtime strings does not satisfy the Reader-content assertion.
+- EPUB3 was not selected in the latest clean attempt. TEST-017 is not complete and does not pass: both EPUB2 and EPUB3 Reader outcomes were not established together.
+- Evidence is preserved outside Git under `%TEMP%\wave-5h-group-a\product-bug-candidate-test-017\`: blank Reader screenshot, pre-force-stop logcat, picker interaction, read-only database/WAL/SHM copies, and private-files listing.
+
+### Remaining Group A IDs — BLOCKED
+
+- TEST-011: `BLOCKED`; offline loading, title/author filters, empty results, and placeholder/cover rendering were not attempted.
+- TEST-019: `BLOCKED`; duplicate import and reversible `files/covers` permission injection were not attempted. No permission change was made.
+- TEST-022: `BLOCKED`; cancel and local deletion scenarios were not attempted.
+- TEST-004: historical `PASS`, not re-executed for acceptance. Group A count including that historical result: 1 PASS, 1 FAIL, 3 BLOCKED; `INCOMPLETE`.
+- No TEST-025/030/032/033/034/036/038/043/048/051/052/053 was executed. API 29 remains `NOT_RUN`.
+
+### Harness and regression notes
+
+- Review found that a screenshot-only `PENDING_VISUAL_REVIEW` Reader outcome could otherwise let the runner continue to EPUB3. `group-a.mjs` now records that outcome and throws before EPUB3 or any later TEST ID unless the EPUB2 title and chapter are confirmed. README documents this stop gate. `node --check` and `git diff --check` passed after the gate; no TEST ID was rerun.
+- Final typecheck, full lint, Jest, and helper-test regression were not run after the product candidate, per the stop rule. Only the pre-device baseline above is reported.
+- `PRODUCT_BUG_CANDIDATE`: EPUB2 Reader renders blank in the latest clean attempt after successful import/storage; intermittent prior hierarchy evidence prevents claiming a confirmed root cause. No production fix was made.
+- `TEST_INFRASTRUCTURE`: DocumentsUI required ending Appium while the external picker was foregrounded, selecting the exact visible fixture through its hierarchy/bounds, then starting a fresh Appium session after return. The workflow and stop gate remain harness-only.
+- Production files changed: `NONE`. `package.json`: `NO`; `package-lock.json`: `NO`; `eslint.config.js`: unchanged; TEST-MATRIX unchanged. No dependency was added. No push or merge.
+- Recommendation: `DO NOT MERGE — PRODUCT BUG CANDIDATE FOUND`; triage the intermittent EPUB2 Reader display before resuming Group A from a clean state.
