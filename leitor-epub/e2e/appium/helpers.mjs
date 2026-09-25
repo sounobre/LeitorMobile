@@ -73,6 +73,8 @@ export async function createSession() {
     'appium:appActivity': process.env.APP_ACTIVITY || 'com.example.leitorepub.MainActivity',
     'appium:noReset': true,
     'appium:newCommandTimeout': 300,
+    'appium:adbExecTimeout': 60000,
+    'appium:uiautomator2ServerLaunchTimeout': 60000,
   };
   const payload = await request('/session', {
     method: 'POST',
